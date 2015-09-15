@@ -2,52 +2,46 @@ package main
 
 import (
 	"fmt"
-	"github.com/flosch/pongo2"
-	"gopkg.in/yaml.v2"
-	"io/ioutil"
-	"path"
+	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
+	"log"
+	"net/http"
+	"os"
 )
 
-// Machine configuration
-type Machine struct {
-	Hostname        string
-	OperatingSystem string
-	Finish          string
-	Preseed         string
-	Network         []Interface
-	Vars            map[string]string
-}
+func templateHandler(response http.ResponseWriter, request *http.Request) {
+	hostname := mux.Vars(request)["hostname"]
+	render := mux.Vars(request)["template"]
 
-// Interface Configuration
-type Interface struct {
-	Name       string
-	IPAddress  string
-	MacAddress string
-	Gateway    string
-	Netmask    string
-}
-
-func machineDefinition(hostname string) (Machine, error) {
-	var m Machine
-	data, err := ioutil.ReadFile("conf/" + hostname + ".yaml")
+	m, err := machineDefinition(hostname)
 	if err != nil {
-		return Machine{}, err
+		log.Println(err)
+		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 400)
+		return
 	}
-	yaml.Unmarshal(data, &m)
-	return m, nil
-}
 
-func (m Machine) renderTemplate(templateName string) (string, error) {
-	var tpl = pongo2.Must(pongo2.FromFile(path.Join("templates", templateName)))
-	result, err := tpl.Execute(pongo2.Context{"machine": m})
+	var template string
+	if render == "finish" {
+		template = m.Finish
+	} else {
+		template = m.Preseed
+	}
+
+	renderedTemplate, err := m.renderTemplate(template)
 	if err != nil {
-		return "", err
+		log.Println(err)
+		http.Error(response, "Unable to render template", 400)
+		return
 	}
-	return result, err
-}
 
+	fmt.Fprintf(response, renderedTemplate)
+}
 func main() {
-	m, _ := machineDefinition("example.com")
-	template, _ := m.renderTemplate(m.Finish)
-	fmt.Println(template)
+	r := mux.NewRouter()
+	r.HandleFunc("/{hostname}/{template}",
+		func(response http.ResponseWriter, request *http.Request) {
+			templateHandler(response, request)
+		}).Methods("GET")
+
+	log.Fatal(http.ListenAndServe(":9090", handlers.LoggingHandler(os.Stdout, r)))
 }
