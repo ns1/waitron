@@ -26,9 +26,9 @@ type Interface struct {
 	Netmask    string
 }
 
-func machineDefinition(hostname string) (Machine, error) {
+func machineDefinition(hostname string, machinePath string) (Machine, error) {
 	var m Machine
-	data, err := ioutil.ReadFile("conf/" + hostname + ".yaml")
+	data, err := ioutil.ReadFile(path.Join(machinePath, hostname+".yaml"))
 	if err != nil {
 		return Machine{}, err
 	}
@@ -36,8 +36,8 @@ func machineDefinition(hostname string) (Machine, error) {
 	return m, nil
 }
 
-func (m Machine) renderTemplate(templateName string) (string, error) {
-	var tpl = pongo2.Must(pongo2.FromFile(path.Join("templates", templateName)))
+func (m Machine) renderTemplate(templatePath string) (string, error) {
+	var tpl = pongo2.Must(pongo2.FromFile(templatePath))
 	result, err := tpl.Execute(pongo2.Context{"machine": m})
 	if err != nil {
 		return "", err
