@@ -5,6 +5,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"path"
+	"strings"
 )
 
 // Machine configuration
@@ -13,8 +14,10 @@ type Machine struct {
 	OperatingSystem string
 	Finish          string
 	Preseed         string
+	ShortName       string
+	Domain          string
 	Network         []Interface
-	Vars            map[string]string
+	Params          map[string]string
 }
 
 // Interface Configuration
@@ -33,12 +36,15 @@ func machineDefinition(hostname string, machinePath string) (Machine, error) {
 		return Machine{}, err
 	}
 	yaml.Unmarshal(data, &m)
+	hostSlice := strings.Split(m.Hostname, ".")
+	m.ShortName = hostSlice[0]
+	m.Domain = strings.Join(hostSlice[1:], ".")
 	return m, nil
 }
 
-func (m Machine) renderTemplate(templatePath string) (string, error) {
+func (m Machine) renderTemplate(templatePath string, config Config) (string, error) {
 	var tpl = pongo2.Must(pongo2.FromFile(templatePath))
-	result, err := tpl.Execute(pongo2.Context{"machine": m})
+	result, err := tpl.Execute(pongo2.Context{"machine": m, "config": config})
 	if err != nil {
 		return "", err
 	}

@@ -9,6 +9,6 @@ network:
     macaddress: 00:11:44:24:50
     netmask: 10.120.255.254
     gateway: 10.120.255.254
-vars:
+params:
     foo: False
     bar: "Hello world"
