@@ -154,7 +154,7 @@ func doneHandler(response http.ResponseWriter, request *http.Request, config Con
 func main() {
 	configFile := os.Getenv("CONFIG_FILE")
 	if configFile == "" {
-		log.Fatal("environment variables CONFIG_FILE")
+		log.Fatal("environment variables CONFIG_FILE must be set")
 	}
 
 	configuration, err := loadConfig(configFile)
