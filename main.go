@@ -18,11 +18,13 @@ import (
 
 // Config is our global configuration file
 type Config struct {
-	TemplatePath string
-	MachinePath  string
-	BaseURL      string
-	Params       map[string]string
-	Token        map[string]string
+	TemplatePath        string
+	MachinePath         string
+	BaseURL             string
+	ForemanProxyAddress string `yaml:"foreman_proxy_address"`
+	Params              map[string]string
+	Token               map[string]string
+	PXEConfig           string `yaml:"pxe_config"`
 }
 
 // Loads config.yaml and returns a Config struct
@@ -101,22 +103,23 @@ func buildHandler(response http.ResponseWriter, request *http.Request, config Co
 	m.Token = config.Token[hostname]
 
 	// Load template from config
-	tpl, err := pongo2.FromString(config.Params["pxe_config"])
+	tpl, err := pongo2.FromString(config.PXEConfig)
 	if err != nil {
 		log.Println(err)
 		http.Error(response, "Unable to parse build template", 500)
 		return
 	}
 	// Format template
-	out, err := tpl.Execute(pongo2.Context{"machine": m, "config": config})
+	pxeConfig, err := tpl.Execute(pongo2.Context{"machine": m, "config": config})
 	if err != nil {
 		log.Println(err)
 		http.Error(response, "Unable to format build template", 500)
 		return
 	}
+
 	// Send PXE config to foreman proxy
-	foremanURL := fmt.Sprintf("%s/tftp/%s", config.Params["foremanproxy_address"], m.Network[0].MacAddress)
-	_, err = http.PostForm(foremanURL, url.Values{"syslinux_config": {out}})
+	foremanURL := fmt.Sprintf("%s/tftp/%s", config.ForemanProxyAddress, m.Network[0].MacAddress)
+	_, err = http.PostForm(foremanURL, url.Values{"syslinux_config": {pxeConfig}})
 	if err != nil {
 		log.Println(err)
 		http.Error(response, fmt.Sprintf("Failed to reach foreman-proxy on %s", foremanURL), 500)
@@ -140,7 +143,7 @@ func doneHandler(response http.ResponseWriter, request *http.Request, config Con
 		return
 	}
 
-	foremanURL := fmt.Sprintf("%s/tftp/%s", config.Params["foremanproxy_address"], m.Network[0].MacAddress)
+	foremanURL := fmt.Sprintf("%s/tftp/%s", config.ForemanProxyAddress, m.Network[0].MacAddress)
 	req, _ := http.NewRequest("DELETE", foremanURL, nil)
 	client := &http.Client{}
 	_, err = client.Do(req)
@@ -168,15 +171,15 @@ func main() {
 	r.HandleFunc("/{hostname}/build",
 		func(response http.ResponseWriter, request *http.Request) {
 			buildHandler(response, request, configuration)
-		}).Methods("GET")
+		})
 	r.HandleFunc("/{hostname}/done/{token}",
 		func(response http.ResponseWriter, request *http.Request) {
 			doneHandler(response, request, configuration)
-		}).Methods("GET")
+		})
 	r.HandleFunc("/{hostname}/{template}/{token}",
 		func(response http.ResponseWriter, request *http.Request) {
 			templateHandler(response, request, configuration)
-		}).Methods("GET")
+		})
 
 	log.Println("Starting Server")
 	log.Fatal(http.ListenAndServe(":9090", handlers.LoggingHandler(os.Stdout, r)))
