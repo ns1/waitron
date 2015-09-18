@@ -2,17 +2,18 @@ package main
 
 import (
 	"fmt"
-	"github.com/flosch/pongo2"
-	"github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
-	"github.com/satori/go.uuid"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+
+	"github.com/flosch/pongo2"
+	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
+	"github.com/satori/go.uuid"
+	"gopkg.in/yaml.v2"
 )
 
 // Config is our global configuration file
@@ -24,6 +25,7 @@ type Config struct {
 	Token        map[string]string
 }
 
+// Loads config.yaml and returns a Config struct
 func loadConfig(configPath string) (Config, error) {
 	var c Config
 	data, err := ioutil.ReadFile(configPath)
@@ -94,6 +96,9 @@ func buildHandler(response http.ResponseWriter, request *http.Request, config Co
 	// Generate a random token used to authenticate requests
 	config.Token[hostname] = uuid.NewV4().String()
 	log.Println(fmt.Sprintf("%s installation token: %s", hostname, config.Token[hostname]))
+
+	// Add token to machine struct
+	m.Token = config.Token[hostname]
 
 	// Load template from config
 	tpl, err := pongo2.FromString(config.Params["pxe_config"])
