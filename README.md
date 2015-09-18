@@ -1,5 +1,5 @@
 # Templetation
-Templetation reads the machine definition from a YAML file and template preseed and finish templates based on that data
+Templetation reads the machine definition from YAML and templates preseed and finish scripts based on that data.
 
 Test locally
 
