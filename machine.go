@@ -16,6 +16,7 @@ type Machine struct {
 	Preseed         string
 	ShortName       string
 	Domain          string
+	Token           string // This is set by the service
 	Network         []Interface
 	Params          map[string]string
 }

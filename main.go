@@ -5,6 +5,7 @@ import (
 	"github.com/flosch/pongo2"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/satori/go.uuid"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
@@ -20,6 +21,7 @@ type Config struct {
 	MachinePath  string
 	BaseURL      string
 	Params       map[string]string
+	Token        map[string]string
 }
 
 func loadConfig(configPath string) (Config, error) {
@@ -36,6 +38,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 	config Config) {
 	hostname := mux.Vars(request)["hostname"]
 	render := mux.Vars(request)["template"]
+	token := mux.Vars(request)["token"]
 
 	m, err := machineDefinition(hostname, config.MachinePath)
 	if err != nil {
@@ -43,6 +46,14 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 400)
 		return
 	}
+
+	if token != config.Token[hostname] {
+		http.Error(response, "Invalid Token", 401)
+		return
+	}
+
+	// Set token used in template
+	m.Token = config.Token[hostname]
 
 	// Render preseed as default
 	var template string
@@ -80,6 +91,10 @@ func buildHandler(response http.ResponseWriter, request *http.Request, config Co
 		return
 	}
 
+	// Generate a random token used to authenticate requests
+	config.Token[hostname] = uuid.NewV4().String()
+	log.Println(fmt.Sprintf("%s installation token: %s", hostname, config.Token[hostname]))
+
 	// Load template from config
 	tpl, err := pongo2.FromString(config.Params["pxe_config"])
 	if err != nil {
@@ -107,11 +122,16 @@ func buildHandler(response http.ResponseWriter, request *http.Request, config Co
 
 func doneHandler(response http.ResponseWriter, request *http.Request, config Config) {
 	hostname := mux.Vars(request)["hostname"]
-
+	token := mux.Vars(request)["token"]
 	m, err := machineDefinition(hostname, config.MachinePath)
 	if err != nil {
 		log.Println(err)
 		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 500)
+		return
+	}
+
+	if token != config.Token[hostname] {
+		http.Error(response, "Invalid Token", 401)
 		return
 	}
 
@@ -136,17 +156,19 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// Initialize map containing hostname[token]
+	configuration.Token = make(map[string]string)
 
 	r := mux.NewRouter()
 	r.HandleFunc("/{hostname}/build",
 		func(response http.ResponseWriter, request *http.Request) {
 			buildHandler(response, request, configuration)
 		}).Methods("GET")
-	r.HandleFunc("/{hostname}/done",
+	r.HandleFunc("/{hostname}/done/{token}",
 		func(response http.ResponseWriter, request *http.Request) {
 			doneHandler(response, request, configuration)
 		}).Methods("GET")
-	r.HandleFunc("/{hostname}/{template}",
+	r.HandleFunc("/{hostname}/{template}/{token}",
 		func(response http.ResponseWriter, request *http.Request) {
 			templateHandler(response, request, configuration)
 		}).Methods("GET")
