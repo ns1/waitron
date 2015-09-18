@@ -1,2 +1,6 @@
+# Templetation
+Templetation reads the machine definition from a YAML file and template preseed and finish templates based on that data
 
-    export TEMPLATE_PATH=templates && export MACHINE_PATH=conf && go build . && ./templetation
+Test locally
+
+    export CONFIG_FILE=config.yaml && go build . && ./templetation

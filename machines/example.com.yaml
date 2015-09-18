@@ -1,0 +1,14 @@
+hostname: example.com
+operatingsystem: "14.04"
+preseed: preseed.j2
+finish: finish.j2
+
+network:
+  - name: eth0
+    ipaddress: 10.20.30.40
+    macaddress: 00:11:44:24:50
+    netmask: 10.120.255.254
+    gateway: 10.120.255.254
+params:
+    foo: False
+    bar: "Hello world"
