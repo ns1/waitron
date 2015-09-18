@@ -42,6 +42,7 @@ func machineDefinition(hostname string, machinePath string) (Machine, error) {
 	return m, nil
 }
 
+// Render template among with machine and config struct
 func (m Machine) renderTemplate(templatePath string, config Config) (string, error) {
 	var tpl = pongo2.Must(pongo2.FromFile(templatePath))
 	result, err := tpl.Execute(pongo2.Context{"machine": m, "config": config})

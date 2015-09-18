@@ -2,19 +2,23 @@ package main
 
 import (
 	"fmt"
+	"github.com/flosch/pongo2"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 )
 
+// Config is our global configuration file
 type Config struct {
 	TemplatePath string
 	MachinePath  string
+	BaseURL      string
 	Params       map[string]string
 }
 
@@ -40,6 +44,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 		return
 	}
 
+	// Render preseed as default
 	var template string
 	if render == "finish" {
 		template = m.Finish
@@ -64,10 +69,65 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 
 	fmt.Fprintf(response, renderedTemplate)
 }
+
+func buildHandler(response http.ResponseWriter, request *http.Request, config Config) {
+	hostname := mux.Vars(request)["hostname"]
+
+	m, err := machineDefinition(hostname, config.MachinePath)
+	if err != nil {
+		log.Println(err)
+		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 500)
+		return
+	}
+
+	// Load template from config
+	tpl, err := pongo2.FromString(config.Params["pxe_config"])
+	if err != nil {
+		log.Println(err)
+		http.Error(response, "Unable to parse build template", 500)
+		return
+	}
+	// Format template
+	out, err := tpl.Execute(pongo2.Context{"machine": m, "config": config})
+	if err != nil {
+		log.Println(err)
+		http.Error(response, "Unable to format build template", 500)
+		return
+	}
+	// Send PXE config to foreman proxy
+	foremanURL := fmt.Sprintf("%s/tftp/%s", config.Params["foremanproxy_address"], m.Network[0].MacAddress)
+	_, err = http.PostForm(foremanURL, url.Values{"syslinux_config": {out}})
+	if err != nil {
+		log.Println(err)
+		http.Error(response, fmt.Sprintf("Failed to reach foreman-proxy on %s", foremanURL), 500)
+		return
+	}
+	fmt.Fprintf(response, "OK")
+}
+
+func doneHandler(response http.ResponseWriter, request *http.Request, config Config) {
+	hostname := mux.Vars(request)["hostname"]
+
+	m, err := machineDefinition(hostname, config.MachinePath)
+	if err != nil {
+		log.Println(err)
+		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 500)
+		return
+	}
+
+	foremanURL := fmt.Sprintf("%s/tftp/%s", config.Params["foremanproxy_address"], m.Network[0].MacAddress)
+	req, _ := http.NewRequest("DELETE", foremanURL, nil)
+	client := &http.Client{}
+	_, err = client.Do(req)
+	if err != nil {
+		log.Println(err)
+		http.Error(response, fmt.Sprintf("Failed to reach foreman-proxy on %s", foremanURL), 500)
+		return
+	}
+	fmt.Fprintf(response, "OK")
+}
 func main() {
-
 	configFile := os.Getenv("CONFIG_FILE")
-
 	if configFile == "" {
 		log.Fatal("environment variables CONFIG_FILE")
 	}
@@ -78,6 +138,14 @@ func main() {
 	}
 
 	r := mux.NewRouter()
+	r.HandleFunc("/{hostname}/build",
+		func(response http.ResponseWriter, request *http.Request) {
+			buildHandler(response, request, configuration)
+		}).Methods("GET")
+	r.HandleFunc("/{hostname}/done",
+		func(response http.ResponseWriter, request *http.Request) {
+			doneHandler(response, request, configuration)
+		}).Methods("GET")
 	r.HandleFunc("/{hostname}/{template}",
 		func(response http.ResponseWriter, request *http.Request) {
 			templateHandler(response, request, configuration)
