@@ -2,47 +2,20 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
 
-	"github.com/flosch/pongo2"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/satori/go.uuid"
-	"gopkg.in/yaml.v2"
 )
 
-// Config is our global configuration file
-type Config struct {
-	TemplatePath        string
-	MachinePath         string
-	BaseURL             string
-	ForemanProxyAddress string `yaml:"foreman_proxy_address"`
-	Params              map[string]string
-	Token               map[string]string
-	PXEConfig           string `yaml:"pxe_config"`
-}
-
-// Loads config.yaml and returns a Config struct
-func loadConfig(configPath string) (Config, error) {
-	var c Config
-	data, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		return Config{}, err
-	}
-	yaml.Unmarshal(data, &c)
-	return c, nil
-}
-
+// templateHandler renders either the finish or the preseed template
 func templateHandler(response http.ResponseWriter, request *http.Request,
 	config Config) {
 	hostname := mux.Vars(request)["hostname"]
-	render := mux.Vars(request)["template"]
-	token := mux.Vars(request)["token"]
 
 	m, err := machineDefinition(hostname, config.MachinePath)
 	if err != nil {
@@ -51,7 +24,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 		return
 	}
 
-	if token != config.Token[hostname] {
+	if mux.Vars(request)["token"] != config.Token[hostname] {
 		http.Error(response, "Invalid Token", 401)
 		return
 	}
@@ -61,7 +34,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 
 	// Render preseed as default
 	var template string
-	if render == "finish" {
+	if mux.Vars(request)["template"] == "finish" {
 		template = m.Finish
 	} else {
 		template = m.Preseed
@@ -102,35 +75,21 @@ func buildHandler(response http.ResponseWriter, request *http.Request, config Co
 	// Add token to machine struct
 	m.Token = config.Token[hostname]
 
-	// Load template from config
-	tpl, err := pongo2.FromString(config.PXEConfig)
+	err = m.setBuildMode(config)
 	if err != nil {
 		log.Println(err)
-		http.Error(response, "Unable to parse build template", 500)
-		return
-	}
-	// Format template
-	pxeConfig, err := tpl.Execute(pongo2.Context{"machine": m, "config": config})
-	if err != nil {
-		log.Println(err)
-		http.Error(response, "Unable to format build template", 500)
-		return
-	}
-
-	// Send PXE config to foreman proxy
-	foremanURL := fmt.Sprintf("%s/tftp/%s", config.ForemanProxyAddress, m.Network[0].MacAddress)
-	_, err = http.PostForm(foremanURL, url.Values{"syslinux_config": {pxeConfig}})
-	if err != nil {
-		log.Println(err)
-		http.Error(response, fmt.Sprintf("Failed to reach foreman-proxy on %s", foremanURL), 500)
+		http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), 500)
 		return
 	}
 	fmt.Fprintf(response, "OK")
 }
 
+/*
+doneHandler sends a DELETE to the foreman-proxy telling it the installation
+is complete and the pxe configuration can be removed
+*/
 func doneHandler(response http.ResponseWriter, request *http.Request, config Config) {
 	hostname := mux.Vars(request)["hostname"]
-	token := mux.Vars(request)["token"]
 	m, err := machineDefinition(hostname, config.MachinePath)
 	if err != nil {
 		log.Println(err)
@@ -138,22 +97,20 @@ func doneHandler(response http.ResponseWriter, request *http.Request, config Con
 		return
 	}
 
-	if token != config.Token[hostname] {
+	if mux.Vars(request)["token"] != config.Token[hostname] {
 		http.Error(response, "Invalid Token", 401)
 		return
 	}
 
-	foremanURL := fmt.Sprintf("%s/tftp/%s", config.ForemanProxyAddress, m.Network[0].MacAddress)
-	req, _ := http.NewRequest("DELETE", foremanURL, nil)
-	client := &http.Client{}
-	_, err = client.Do(req)
+	err = m.cancelBuildMode(config)
 	if err != nil {
 		log.Println(err)
-		http.Error(response, fmt.Sprintf("Failed to reach foreman-proxy on %s", foremanURL), 500)
+		http.Error(response, "Failed to cancel build mode", 500)
 		return
 	}
 	fmt.Fprintf(response, "OK")
 }
+
 func main() {
 	configFile := os.Getenv("CONFIG_FILE")
 	if configFile == "" {

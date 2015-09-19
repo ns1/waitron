@@ -1,4 +1,4 @@
-hostname: example.com
+hostname: my-service.example.com
 operatingsystem: "14.04"
 preseed: preseed.j2
 finish: finish.j2

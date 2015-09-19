@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"github.com/flosch/pongo2"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"path"
 	"strings"
 )
@@ -36,7 +39,10 @@ func machineDefinition(hostname string, machinePath string) (Machine, error) {
 	if err != nil {
 		return Machine{}, err
 	}
-	yaml.Unmarshal(data, &m)
+	err = yaml.Unmarshal(data, &m)
+	if err != nil {
+		return Machine{}, err
+	}
 	hostSlice := strings.Split(m.Hostname, ".")
 	m.ShortName = hostSlice[0]
 	m.Domain = strings.Join(hostSlice[1:], ".")
@@ -51,4 +57,31 @@ func (m Machine) renderTemplate(templatePath string, config Config) (string, err
 		return "", err
 	}
 	return result, err
+}
+
+// Posts machine macaddress to the forman proxy among with pxe configuration
+func (m Machine) setBuildMode(config Config) error {
+	pxeConfig, err := config.getPXEConfig(m)
+	if err != nil {
+		return err
+	}
+
+	foremanURL := fmt.Sprintf("%s/tftp/%s", config.ForemanProxyAddress, m.Network[0].MacAddress)
+	_, err = http.PostForm(foremanURL, url.Values{"syslinux_config": {pxeConfig}})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Sends DELETE to the forman-proxy tftp API removing the pxe configuration
+func (m Machine) cancelBuildMode(config Config) error {
+	foremanURL := fmt.Sprintf("%s/tftp/%s", config.ForemanProxyAddress, m.Network[0].MacAddress)
+	req, _ := http.NewRequest("DELETE", foremanURL, nil)
+	client := &http.Client{}
+	_, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	return nil
 }
