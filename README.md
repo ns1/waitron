@@ -1,6 +1,12 @@
-# Templetation
-Templetation reads the machine definition from YAML and templates preseed and finish scripts based on that data.
+# Provisioner
+Provisioner read the machine definition from YAML and templates preseed and finish scripts based on that data. Provisioner contacts foreman-proxy's tftp API to set a machine in build mode(templates PXE configuration)
 
-Test locally
+Run in docker container
+
+    docker run -v /path/to/data:/data \
+        -e CONFIG_FILE=/data/config.yaml
+        jhaals/provisioner
+
+Run locally
 
     export CONFIG_FILE=config.yaml && go build . && ./templetation
