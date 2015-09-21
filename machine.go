@@ -60,14 +60,9 @@ func (m Machine) renderTemplate(templatePath string, config Config) (string, err
 }
 
 // Posts machine macaddress to the forman proxy among with pxe configuration
-func (m Machine) setBuildMode(config Config) error {
-	pxeConfig, err := config.getPXEConfig(m)
-	if err != nil {
-		return err
-	}
-
+func (m Machine) setBuildMode(config Config, pxeConfig string) error {
 	foremanURL := fmt.Sprintf("%s/tftp/%s", config.ForemanProxyAddress, m.Network[0].MacAddress)
-	_, err = http.PostForm(foremanURL, url.Values{"syslinux_config": {pxeConfig}})
+	_, err := http.PostForm(foremanURL, url.Values{"syslinux_config": {pxeConfig}})
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/flosch/pongo2"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 )
@@ -15,22 +14,6 @@ type Config struct {
 	Params              map[string]string
 	Token               map[string]string
 	PXEConfig           string `yaml:"pxe_config"`
-}
-
-// returns a rendered template based on PXEConfig
-func (c Config) getPXEConfig(machine Machine) (string, error) {
-	// Load template from config
-	tpl, err := pongo2.FromString(c.PXEConfig)
-	if err != nil {
-		return "", err
-	}
-
-	// Format template
-	pxeConfig, err := tpl.Execute(pongo2.Context{"machine": machine, "config": c})
-	if err != nil {
-		return "", err
-	}
-	return pxeConfig, nil
 }
 
 // Loads config.yaml and returns a Config struct

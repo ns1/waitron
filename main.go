@@ -74,8 +74,9 @@ func buildHandler(response http.ResponseWriter, request *http.Request, config Co
 
 	// Add token to machine struct
 	m.Token = config.Token[hostname]
+	template, err := m.renderTemplate(path.Join(config.TemplatePath, "pxe.j2"), config)
 
-	err = m.setBuildMode(config)
+	err = m.setBuildMode(config, template)
 	if err != nil {
 		log.Println(err)
 		http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), 500)
