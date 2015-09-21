@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/flosch/pongo2"
 	"gopkg.in/yaml.v2"
@@ -62,9 +63,12 @@ func (m Machine) renderTemplate(templatePath string, config Config) (string, err
 // Posts machine macaddress to the forman proxy among with pxe configuration
 func (m Machine) setBuildMode(config Config, pxeConfig string) error {
 	foremanURL := fmt.Sprintf("%s/tftp/%s", config.ForemanProxyAddress, m.Network[0].MacAddress)
-	_, err := http.PostForm(foremanURL, url.Values{"syslinux_config": {pxeConfig}})
+	result, err := http.PostForm(foremanURL, url.Values{"syslinux_config": {pxeConfig}})
 	if err != nil {
 		return err
+	}
+	if result.StatusCode != 200 {
+		return errors.New("foreman-proxy responded with a non 200 exit code")
 	}
 	return nil
 }
