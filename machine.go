@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 )
@@ -51,8 +52,14 @@ func machineDefinition(hostname string, machinePath string) (Machine, error) {
 }
 
 // Render template among with machine and config struct
-func (m Machine) renderTemplate(templatePath string, config Config) (string, error) {
-	var tpl = pongo2.Must(pongo2.FromFile(templatePath))
+func (m Machine) renderTemplate(template string, config Config) (string, error) {
+
+	template = path.Join(config.TemplatePath, template)
+	if _, err := os.Stat(template); err != nil {
+		return "", errors.New("Template does not exist")
+	}
+
+	var tpl = pongo2.Must(pongo2.FromFile(template))
 	result, err := tpl.Execute(pongo2.Context{"machine": m, "config": config})
 	if err != nil {
 		return "", err

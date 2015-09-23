@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path"
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -47,15 +46,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 		template = m.Preseed
 	}
 
-	tpl := path.Join(config.TemplatePath, template)
-
-	if _, err := os.Stat(tpl); err != nil {
-		log.Println(err)
-		http.Error(response, "Template file does not exist", 400)
-		return
-	}
-
-	renderedTemplate, err := m.renderTemplate(tpl, config)
+	renderedTemplate, err := m.renderTemplate(template, config)
 	if err != nil {
 		log.Println(err)
 		http.Error(response, "Unable to render template", 400)
@@ -81,7 +72,7 @@ func buildHandler(response http.ResponseWriter, request *http.Request, config Co
 
 	// Add token to machine struct
 	m.Token = config.Token[hostname]
-	template, err := m.renderTemplate(path.Join(config.TemplatePath, "pxe.j2"), config)
+	template, err := m.renderTemplate("pxe.j2", config)
 
 	err = m.setBuildMode(config, template)
 	if err != nil {
