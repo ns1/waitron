@@ -3,6 +3,7 @@ package main
 import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"path"
 )
 
 // Config is our global configuration file
@@ -12,8 +13,9 @@ type Config struct {
 	BaseURL             string
 	ForemanProxyAddress string `yaml:"foreman_proxy_address"`
 	Params              map[string]string
-	Token               map[string]string
 	PXEConfig           string `yaml:"pxe_config"`
+	Token               map[string]string
+	MachineState        map[string]string
 }
 
 // Loads config.yaml and returns a Config struct
@@ -23,6 +25,28 @@ func loadConfig(configPath string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	yaml.Unmarshal(data, &c)
+	err = yaml.Unmarshal(data, &c)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// Initialize map containing hostname[token]
+	c.Token = make(map[string]string)
+	c.MachineState = make(map[string]string)
 	return c, nil
+}
+
+func (c Config) listMachines() ([]string, error) {
+	var machines []string
+	files, err := ioutil.ReadDir(c.MachinePath)
+	for _, file := range files {
+		name := file.Name()
+		if path.Ext(name) == ".yaml" {
+			machines = append(machines, name)
+		}
+	}
+	if err != nil {
+		return machines, err
+	}
+	return machines, nil
 }

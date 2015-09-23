@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,6 +12,12 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/satori/go.uuid"
 )
+
+type result struct {
+	Token string `json:",omitempty"`
+	Error string `json:",omitempty"`
+	State string `json:",omitempty"`
+}
 
 // templateHandler renders either the finish or the preseed template
 func templateHandler(response http.ResponseWriter, request *http.Request,
@@ -82,6 +89,8 @@ func buildHandler(response http.ResponseWriter, request *http.Request, config Co
 		http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), 500)
 		return
 	}
+
+	config.MachineState[hostname] = "Installing"
 	fmt.Fprintf(response, "OK")
 }
 
@@ -109,7 +118,33 @@ func doneHandler(response http.ResponseWriter, request *http.Request, config Con
 		http.Error(response, "Failed to cancel build mode", 500)
 		return
 	}
+	config.MachineState[hostname] = "Installed"
 	fmt.Fprintf(response, "OK")
+}
+
+func hostStatus(response http.ResponseWriter, request *http.Request, config Config) {
+	status := config.MachineState[mux.Vars(request)["hostname"]]
+	if status == "" {
+		http.Error(response, "Unknown state", 500)
+		return
+	}
+	fmt.Fprintf(response, status)
+}
+
+func listMachinesHandler(response http.ResponseWriter, request *http.Request, config Config) {
+	machines, err := config.listMachines()
+	if err != nil {
+		log.Println(err)
+		http.Error(response, "Unable to list machines", 500)
+		return
+	}
+	result, _ := json.Marshal(machines)
+	response.Write(result)
+}
+
+func status(response http.ResponseWriter, request *http.Request, config Config) {
+	result, _ := json.Marshal(&config.MachineState)
+	response.Write(result)
 }
 
 func main() {
@@ -122,13 +157,23 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// Initialize map containing hostname[token]
-	configuration.Token = make(map[string]string)
 
 	r := mux.NewRouter()
 	r.HandleFunc("/{hostname}/build",
 		func(response http.ResponseWriter, request *http.Request) {
 			buildHandler(response, request, configuration)
+		})
+	r.HandleFunc("/{hostname}/status",
+		func(response http.ResponseWriter, request *http.Request) {
+			hostStatus(response, request, configuration)
+		})
+	r.HandleFunc("/status",
+		func(response http.ResponseWriter, request *http.Request) {
+			status(response, request, configuration)
+		})
+	r.HandleFunc("/list",
+		func(response http.ResponseWriter, request *http.Request) {
+			listMachinesHandler(response, request, configuration)
 		})
 	r.HandleFunc("/{hostname}/done/{token}",
 		func(response http.ResponseWriter, request *http.Request) {
