@@ -72,14 +72,18 @@ func buildHandler(response http.ResponseWriter, request *http.Request, config Co
 
 	// Add token to machine struct
 	m.Token = config.Token[hostname]
-	template, err := m.renderTemplate("pxe.j2", config)
+	//template, err := m.renderTemplate("pxe.j2", config)
 
-	err = m.setBuildMode(config, template)
-	if err != nil {
-		log.Println(err)
-		http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), 500)
-		return
-	}
+	//err = m.setBuildMode(config, template)
+	//if err != nil {
+	//	log.Println(err)
+	//	http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), 500)
+	//	return
+	//}
+
+	//Add to the MachineBuild table
+	config.MachineBuild[fmt.Sprintf("%s", m.Network[0].MacAddress)] = hostname
+	log.Println(config)
 
 	config.MachineState[hostname] = "Installing"
 	fmt.Fprintf(response, "OK")
@@ -103,12 +107,16 @@ func doneHandler(response http.ResponseWriter, request *http.Request, config Con
 		return
 	}
 
-	err = m.cancelBuildMode(config)
-	if err != nil {
-		log.Println(err)
-		http.Error(response, "Failed to cancel build mode", 500)
-		return
-	}
+	//err = m.cancelBuildMode(config)
+	//if err != nil {
+	//	log.Println(err)
+	//	http.Error(response, "Failed to cancel build mode", 500)
+	//	return
+	//}
+
+	//Delete mac from the building map
+	delete(config.MachineBuild, fmt.Sprintf("%s", m.Network[0].MacAddress))
+
 	config.MachineState[hostname] = "Installed"
 	fmt.Fprintf(response, "OK")
 }
@@ -138,6 +146,25 @@ func status(response http.ResponseWriter, request *http.Request, config Config) 
 	response.Write(result)
 }
 
+func pixieHandler(response http.ResponseWriter, request *http.Request, config Config) {
+
+	macaddr := mux.Vars(request)["macaddr"]
+
+	hostname, ok := config.MachineBuild[macaddr]
+
+	if ok {
+		if mux.Vars(request)["token"] != config.Token[hostname] {
+			http.Error(response, "Invalid Token", 401)
+			return
+		}
+		result, _ := json.Marshal(pixieInit(config))
+		log.Println(macaddr)
+		response.Write(result)
+	} else {
+		http.Error(response, "Not in build mode", 404)
+	}
+}
+
 func main() {
 	configFile := os.Getenv("CONFIG_FILE")
 	if configFile == "" {
@@ -150,6 +177,7 @@ func main() {
 	}
 
 	r := mux.NewRouter()
+	s := r.PathPrefix("/v1/").Subrouter()
 	r.HandleFunc("/{hostname}/build",
 		func(response http.ResponseWriter, request *http.Request) {
 			buildHandler(response, request, configuration)
@@ -173,6 +201,10 @@ func main() {
 	r.HandleFunc("/{hostname}/{template}/{token}",
 		func(response http.ResponseWriter, request *http.Request) {
 			templateHandler(response, request, configuration)
+		})
+	s.HandleFunc("/boot/{macaddr}/{token}",
+		func(response http.ResponseWriter, request *http.Request) {
+			pixieHandler(response, request, configuration)
 		})
 
 	log.Println("Starting Server")
