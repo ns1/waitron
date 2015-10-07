@@ -72,7 +72,6 @@ func buildHandler(response http.ResponseWriter, request *http.Request, config Co
 		return
 	}
 
-	log.Println(m)
 	fmt.Fprintf(response, "OK")
 }
 
