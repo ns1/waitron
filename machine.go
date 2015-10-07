@@ -35,6 +35,13 @@ type Interface struct {
 	Netmask    string
 }
 
+// PXE boot configuration
+type Pixie struct {
+	Kernel  string   `json:"kernel"`
+	Initrd  []string `json:"initrd"`
+	Cmdline string   `json:"cmdline"`
+}
+
 func machineDefinition(hostname string, machinePath string) (Machine, error) {
 	var m Machine
 	data, err := ioutil.ReadFile(path.Join(machinePath, hostname+".yaml"))
@@ -90,4 +97,15 @@ func (m Machine) cancelBuildMode(config Config) error {
 		return err
 	}
 	return nil
+}
+
+// Builds pxe config to be sent to pixiecore
+func (m Machine) pixieInit(config Config) (Pixie, error) {
+	var p Pixie
+
+	p.Kernel = config.ImageURL + config.Kernel
+	p.Initrd = []string{config.ImageURL + config.Initrd}
+	p.Cmdline = "interface=auto url=" + config.BaseURL + "/" + m.Hostname + "/preseed/" + m.Token + " ramdisk_size=10800 root=/dev/rd/0 rw auto hostname=" + m.Hostname + " console-setup/ask_detect=false console-setup/layout=USA console-setup/variant=USA keyboard-configuration/layoutcode=us localechooser/translation/warn-light=true localechooser/translation/warn-severe=true locale=en_US"
+
+	return p, nil
 }

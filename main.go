@@ -83,9 +83,9 @@ func buildHandler(response http.ResponseWriter, request *http.Request, config Co
 
 	//Add to the MachineBuild table
 	config.MachineBuild[fmt.Sprintf("%s", m.Network[0].MacAddress)] = hostname
-	log.Println(config)
 
 	config.MachineState[hostname] = "Installing"
+	log.Println(m)
 	fmt.Fprintf(response, "OK")
 }
 
@@ -149,16 +149,28 @@ func status(response http.ResponseWriter, request *http.Request, config Config) 
 func pixieHandler(response http.ResponseWriter, request *http.Request, config Config) {
 
 	macaddr := mux.Vars(request)["macaddr"]
+	hostname, found := config.MachineBuild[macaddr]
 
-	_, ok := config.MachineBuild[macaddr]
-
-	if ok {
-		result, _ := json.Marshal(pixieInit(config))
-		log.Println(macaddr)
-		response.Write(result)
-	} else {
+	if found == false {
+		log.Println(found)
 		http.Error(response, "Not in build mode", 404)
+		return
 	}
+
+	m, err := machineDefinition(hostname, config.MachinePath)
+
+	m.Token = config.Token[hostname]
+
+	if err != nil {
+		log.Println(err)
+		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 500)
+		return
+	}
+
+	pxeconfig, _ := m.pixieInit(config)
+	result, _ := json.Marshal(pxeconfig)
+	response.Write(result)
+
 }
 
 func main() {
