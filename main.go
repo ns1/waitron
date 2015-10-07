@@ -150,13 +150,9 @@ func pixieHandler(response http.ResponseWriter, request *http.Request, config Co
 
 	macaddr := mux.Vars(request)["macaddr"]
 
-	hostname, ok := config.MachineBuild[macaddr]
+	_, ok := config.MachineBuild[macaddr]
 
 	if ok {
-		if mux.Vars(request)["token"] != config.Token[hostname] {
-			http.Error(response, "Invalid Token", 401)
-			return
-		}
 		result, _ := json.Marshal(pixieInit(config))
 		log.Println(macaddr)
 		response.Write(result)
@@ -202,7 +198,7 @@ func main() {
 		func(response http.ResponseWriter, request *http.Request) {
 			templateHandler(response, request, configuration)
 		})
-	s.HandleFunc("/boot/{macaddr}/{token}",
+	s.HandleFunc("/boot/{macaddr}",
 		func(response http.ResponseWriter, request *http.Request) {
 			pixieHandler(response, request, configuration)
 		})
