@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/flosch/pongo2"
+	"github.com/satori/go.uuid"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
-	"net/http"
-	"net/url"
+	"log"
 	"os"
 	"path"
 	"strings"
@@ -75,27 +75,26 @@ func (m Machine) renderTemplate(template string, config Config) (string, error) 
 }
 
 // Posts machine macaddress to the forman proxy among with pxe configuration
-func (m Machine) setBuildMode(config Config, pxeConfig string) error {
-	foremanURL := fmt.Sprintf("%s/tftp/%s", config.ForemanProxyAddress, m.Network[0].MacAddress)
-	result, err := http.PostForm(foremanURL, url.Values{"syslinux_config": {pxeConfig}})
-	if err != nil {
-		return err
-	}
-	if result.StatusCode != 200 {
-		return errors.New("foreman-proxy responded with a non 200 exit code")
-	}
+func (m Machine) setBuildMode(config Config) error {
+	// Generate a random token used to authenticate requests
+	config.Token[m.Hostname] = uuid.NewV4().String()
+	log.Println(fmt.Sprintf("%s installation token: %s", m.Hostname, config.Token[m.Hostname]))
+	// Add token to machine struct
+	m.Token = config.Token[m.Hostname]
+	//Add to the MachineBuild table
+	config.MachineBuild[fmt.Sprintf("%s", m.Network[0].MacAddress)] = m.Hostname
+	//Change machine state
+	config.MachineState[m.Hostname] = "Installing"
 	return nil
 }
 
 // Sends DELETE to the forman-proxy tftp API removing the pxe configuration
 func (m Machine) cancelBuildMode(config Config) error {
-	foremanURL := fmt.Sprintf("%s/tftp/%s", config.ForemanProxyAddress, m.Network[0].MacAddress)
-	req, _ := http.NewRequest("DELETE", foremanURL, nil)
-	client := &http.Client{}
-	_, err := client.Do(req)
-	if err != nil {
-		return err
-	}
+	//Delete mac from the building map
+	delete(config.MachineBuild, fmt.Sprintf("%s", m.Network[0].MacAddress))
+	//Change machine state
+	config.MachineState[m.Hostname] = "Installed"
+
 	return nil
 }
 

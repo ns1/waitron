@@ -9,7 +9,6 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/satori/go.uuid"
 )
 
 type result struct {
@@ -66,25 +65,13 @@ func buildHandler(response http.ResponseWriter, request *http.Request, config Co
 		return
 	}
 
-	// Generate a random token used to authenticate requests
-	config.Token[hostname] = uuid.NewV4().String()
-	log.Println(fmt.Sprintf("%s installation token: %s", hostname, config.Token[hostname]))
+	err = m.setBuildMode(config)
+	if err != nil {
+		log.Println(err)
+		http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), 500)
+		return
+	}
 
-	// Add token to machine struct
-	m.Token = config.Token[hostname]
-	//template, err := m.renderTemplate("pxe.j2", config)
-
-	//err = m.setBuildMode(config, template)
-	//if err != nil {
-	//	log.Println(err)
-	//	http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), 500)
-	//	return
-	//}
-
-	//Add to the MachineBuild table
-	config.MachineBuild[fmt.Sprintf("%s", m.Network[0].MacAddress)] = hostname
-
-	config.MachineState[hostname] = "Installing"
 	log.Println(m)
 	fmt.Fprintf(response, "OK")
 }
@@ -107,17 +94,13 @@ func doneHandler(response http.ResponseWriter, request *http.Request, config Con
 		return
 	}
 
-	//err = m.cancelBuildMode(config)
-	//if err != nil {
-	//	log.Println(err)
-	//	http.Error(response, "Failed to cancel build mode", 500)
-	//	return
-	//}
+	err = m.cancelBuildMode(config)
+	if err != nil {
+		log.Println(err)
+		http.Error(response, "Failed to cancel build mode", 500)
+		return
+	}
 
-	//Delete mac from the building map
-	delete(config.MachineBuild, fmt.Sprintf("%s", m.Network[0].MacAddress))
-
-	config.MachineState[hostname] = "Installed"
 	fmt.Fprintf(response, "OK")
 }
 
