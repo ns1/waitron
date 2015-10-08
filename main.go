@@ -9,7 +9,6 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/satori/go.uuid"
 )
 
 type result struct {
@@ -66,22 +65,13 @@ func buildHandler(response http.ResponseWriter, request *http.Request, config Co
 		return
 	}
 
-	// Generate a random token used to authenticate requests
-	config.Token[hostname] = uuid.NewV4().String()
-	log.Println(fmt.Sprintf("%s installation token: %s", hostname, config.Token[hostname]))
-
-	// Add token to machine struct
-	m.Token = config.Token[hostname]
-	template, err := m.renderTemplate("pxe.j2", config)
-
-	err = m.setBuildMode(config, template)
+	err = m.setBuildMode(config)
 	if err != nil {
 		log.Println(err)
 		http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), 500)
 		return
 	}
 
-	config.MachineState[hostname] = "Installing"
 	fmt.Fprintf(response, "OK")
 }
 
@@ -109,7 +99,7 @@ func doneHandler(response http.ResponseWriter, request *http.Request, config Con
 		http.Error(response, "Failed to cancel build mode", 500)
 		return
 	}
-	config.MachineState[hostname] = "Installed"
+
 	fmt.Fprintf(response, "OK")
 }
 
@@ -138,6 +128,33 @@ func status(response http.ResponseWriter, request *http.Request, config Config) 
 	response.Write(result)
 }
 
+func pixieHandler(response http.ResponseWriter, request *http.Request, config Config) {
+
+	macaddr := mux.Vars(request)["macaddr"]
+	hostname, found := config.MachineBuild[macaddr]
+
+	if found == false {
+		log.Println(found)
+		http.Error(response, "Not in build mode", 404)
+		return
+	}
+
+	m, err := machineDefinition(hostname, config.MachinePath)
+
+	m.Token = config.Token[hostname]
+
+	if err != nil {
+		log.Println(err)
+		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 500)
+		return
+	}
+
+	pxeconfig, _ := m.pixieInit(config)
+	result, _ := json.Marshal(pxeconfig)
+	response.Write(result)
+
+}
+
 func main() {
 	configFile := os.Getenv("CONFIG_FILE")
 	if configFile == "" {
@@ -150,6 +167,7 @@ func main() {
 	}
 
 	r := mux.NewRouter()
+	s := r.PathPrefix("/v1/").Subrouter()
 	r.HandleFunc("/{hostname}/build",
 		func(response http.ResponseWriter, request *http.Request) {
 			buildHandler(response, request, configuration)
@@ -173,6 +191,10 @@ func main() {
 	r.HandleFunc("/{hostname}/{template}/{token}",
 		func(response http.ResponseWriter, request *http.Request) {
 			templateHandler(response, request, configuration)
+		})
+	s.HandleFunc("/boot/{macaddr}",
+		func(response http.ResponseWriter, request *http.Request) {
+			pixieHandler(response, request, configuration)
 		})
 
 	log.Println("Starting Server")

@@ -11,11 +11,15 @@ type Config struct {
 	TemplatePath        string
 	MachinePath         string
 	BaseURL             string
+	ImageURL            string `yaml:"image_url"`
+	Kernel              string
+	Initrd              string
 	ForemanProxyAddress string `yaml:"foreman_proxy_address"`
 	Params              map[string]string
 	PXEConfig           string `yaml:"pxe_config"`
 	Token               map[string]string
 	MachineState        map[string]string
+	MachineBuild        map[string]string
 }
 
 // Loads config.yaml and returns a Config struct
@@ -33,6 +37,7 @@ func loadConfig(configPath string) (Config, error) {
 	// Initialize map containing hostname[token]
 	c.Token = make(map[string]string)
 	c.MachineState = make(map[string]string)
+	c.MachineBuild = make(map[string]string)
 	return c, nil
 }
 
