@@ -1,6 +1,5 @@
 package main
 
-// @APIVersion 1.0.0
 // @APITitle Waitron
 // @APIDescription Templates for server provisioning
 // @License BSD
@@ -22,7 +21,16 @@ type result struct {
 	State string `json:",omitempty"`
 }
 
-// templateHandler renders either the finish or the preseed template
+// @Title templateHandler
+// @Description Renders either the finish or the preseed template
+// @Param hostname	path	string	true	"Hostname"
+// @Param template	path	string	true	"The template to be rendered"
+// @Param token		path	string	true	"Token"
+// @Success 200	{object} string "Rendered template"
+// @Failure 400	{object} string "Unable to find host definition for hostname"
+// @Failure 400	{object} string "Unable to render template"
+// @Failure 401	{object} string "Invalid token"
+// @Router {hostname}/{template}/{token} [get]
 func templateHandler(response http.ResponseWriter, request *http.Request,
 	config Config) {
 	hostname := mux.Vars(request)["hostname"]
@@ -61,11 +69,12 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 }
 
 // @Title buildHandler
-// @Description Puts the server in build mode
-// @Accept json
+// @Description Put the server in build mode
 // @Param hostname	path	string	true	"Hostname"
-// @Success 200	{object} string
-// @Router /build/{hostname}
+// @Success 200	{object} string "OK"
+// @Failure 500	{object} string "Unable to find host definition for hostname"
+// @Failure 500	{object} string "Failed to set build mode on hostname"
+// @Router /{hostname}/build [get]
 func buildHandler(response http.ResponseWriter, request *http.Request, config Config) {
 	hostname := mux.Vars(request)["hostname"]
 
@@ -86,10 +95,15 @@ func buildHandler(response http.ResponseWriter, request *http.Request, config Co
 	fmt.Fprintf(response, "OK")
 }
 
-/*
-doneHandler sends a DELETE to the foreman-proxy telling it the installation
-is complete and the pxe configuration can be removed
-*/
+// @Title doneHandler
+// @Description Removes the server from build mode
+// @Param hostname	path	string	true	"Hostname"
+// @Param token		path	string	true	"Token"
+// @Success 200	{object} string "OK"
+// @Failure 500	{object} string "Unable to find host definition for hostname"
+// @Failure 500	{object} string "Failed to cancel build mode"
+// @Failure 401	{object} string "Invalid token"
+// @Router /{hostname}/done/{token} [get]
 func doneHandler(response http.ResponseWriter, request *http.Request, config Config) {
 	hostname := mux.Vars(request)["hostname"]
 	m, err := machineDefinition(hostname, config.MachinePath)
@@ -114,6 +128,12 @@ func doneHandler(response http.ResponseWriter, request *http.Request, config Con
 	fmt.Fprintf(response, "OK")
 }
 
+// @Title hostStatus
+// @Description Build status of the server
+// @Param hostname	path	string	true	"Hostname"
+// @Success 200	{object} string "The status: (installing or installed)"
+// @Failure 500	{object} string "Unknown state"
+// @Router /{hostname}/status [get]
 func hostStatus(response http.ResponseWriter, request *http.Request, config Config) {
 	status := config.MachineState[mux.Vars(request)["hostname"]]
 	if status == "" {
@@ -123,6 +143,11 @@ func hostStatus(response http.ResponseWriter, request *http.Request, config Conf
 	fmt.Fprintf(response, status)
 }
 
+// @Title listMachinesHandler
+// @Description List machines handled by waitron
+// @Success 200	{array} string "List of machines"
+// @Failure 500	{object} string "Unable to list machines"
+// @Router /list [get]
 func listMachinesHandler(response http.ResponseWriter, request *http.Request, config Config) {
 	machines, err := config.listMachines()
 	if err != nil {
@@ -134,11 +159,22 @@ func listMachinesHandler(response http.ResponseWriter, request *http.Request, co
 	response.Write(result)
 }
 
+// @Title status
+// @Description Dictionary with machines and its status
+// @Success 200	{object} string "Dictionary with machines and its status"
+// @Router /status [get]
 func status(response http.ResponseWriter, request *http.Request, config Config) {
 	result, _ := json.Marshal(&config.MachineState)
 	response.Write(result)
 }
 
+// @Title pixieHandler
+// @Description Dictionary with kernel, intrd(s) and commandline for pixiecore
+// @Param macaddr	path	string	true	"MacAddress"
+// @Success 200	{object} string "Dictionary with kernel, intrd(s) and commandline for pixiecore"
+// @Failure 404	{object} string "Not in build mode"
+// @Failure 500	{object} string "Unable to find host definition for hostname"
+// @Router /v1/boot/{macaddr} [get]
 func pixieHandler(response http.ResponseWriter, request *http.Request, config Config) {
 
 	macaddr := mux.Vars(request)["macaddr"]
