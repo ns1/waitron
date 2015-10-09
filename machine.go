@@ -37,7 +37,7 @@ type Interface struct {
 
 // PXE boot configuration
 type Pixie struct {
-	Kernel  string   `json:"kernel"`
+	Kernel  string   `json:"kernel" description:"The kernel file"`
 	Initrd  []string `json:"initrd"`
 	Cmdline string   `json:"cmdline"`
 }
