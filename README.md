@@ -1,5 +1,5 @@
 # waitron
-Waitron reads the machine definition from YAML and templates preseed and finish scripts based on that data. When a server is set in _build_ mode waitron will deliver a kernel/initrd/commandline set to be used by [ pixiecore ] (https://github.com/danderson/pixiecore) (in API mode) to boot and install the machine.
+Waitron reads the machine definition from YAML and templates preseed and finish scripts based on that data. When a server is set in _build_ mode waitron will deliver a kernel/initrd/commandline set to be used by [pixiecore](https://github.com/danderson/pixiecore) (in API mode) to boot and install the machine.
 
 Run in docker container
 
@@ -34,6 +34,5 @@ name | description
 params.dns_servers | string containing the dns servers to be configured in the installed machines
 
 
-### templates
 
 
