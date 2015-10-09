@@ -60,6 +60,9 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 	fmt.Fprintf(response, renderedTemplate)
 }
 
+// @Title build
+// @Description Puts the server in build mode
+// @Resource /build
 func buildHandler(response http.ResponseWriter, request *http.Request, config Config) {
 	hostname := mux.Vars(request)["hostname"]
 
@@ -174,9 +177,6 @@ func main() {
 	r := mux.NewRouter()
 	s := r.PathPrefix("/v1/").Subrouter()
 	r.HandleFunc("/{hostname}/build",
-		// @Title build
-		// @Description Puts the server in build mode
-		// @Resource /build
 		func(response http.ResponseWriter, request *http.Request) {
 			buildHandler(response, request, configuration)
 		})
