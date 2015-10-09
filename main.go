@@ -1,5 +1,10 @@
 package main
 
+// @APIVersion 1.0.0
+// @APITitle Waitron
+// @APIDescription Templates for server provisioning
+// @License BSD
+// @LicenseUrl http://opensource.org/licenses/BSD-2-Clause
 import (
 	"encoding/json"
 	"fmt"
@@ -169,6 +174,9 @@ func main() {
 	r := mux.NewRouter()
 	s := r.PathPrefix("/v1/").Subrouter()
 	r.HandleFunc("/{hostname}/build",
+		// @Title build
+		// @Description Puts the server in build mode
+		// @Resource /build
 		func(response http.ResponseWriter, request *http.Request) {
 			buildHandler(response, request, configuration)
 		})
