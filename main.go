@@ -60,9 +60,12 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 	fmt.Fprintf(response, renderedTemplate)
 }
 
-// @Title build
+// @Title buildHandler
 // @Description Puts the server in build mode
-// @Resource /build
+// @Accept json
+// @Param hostname	path	string	true	"Hostname"
+// @Success 200	{object} string
+// @Router /build/{hostname}
 func buildHandler(response http.ResponseWriter, request *http.Request, config Config) {
 	hostname := mux.Vars(request)["hostname"]
 
