@@ -1,6 +1,5 @@
 templatepath: templates
 machinepath: machines
 baseurl: http://127.0.0.1:9090
-foreman_proxy_address: http://127.0.0.1:8000
 params:
     hello: world

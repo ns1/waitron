@@ -11,9 +11,6 @@ type Config struct {
 	TemplatePath        string
 	MachinePath         string
 	BaseURL             string
-	ImageURL            string `yaml:"image_url"`
-	Kernel              string
-	Initrd              string
 	ForemanProxyAddress string `yaml:"foreman_proxy_address"`
 	Params              map[string]string
 	PXEConfig           string `yaml:"pxe_config"`

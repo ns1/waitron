@@ -24,6 +24,10 @@ type Machine struct {
 	Token           string // This is set by the service
 	Network         []Interface
 	Params          map[string]string
+	ImageURL        string `yaml:"image_url"`
+	Kernel          string
+	Initrd          string
+	Cmdline         string
 }
 
 // Interface Configuration
@@ -102,9 +106,18 @@ func (m Machine) cancelBuildMode(config Config) error {
 func (m Machine) pixieInit(config Config) (Pixie, error) {
 	var p Pixie
 
-	p.Kernel = config.ImageURL + config.Kernel
-	p.Initrd = []string{config.ImageURL + config.Initrd}
-	p.Cmdline = "interface=auto url=" + config.BaseURL + "/" + m.Hostname + "/preseed/" + m.Token + " ramdisk_size=10800 root=/dev/rd/0 rw auto hostname=" + m.Hostname + " console-setup/ask_detect=false console-setup/layout=USA console-setup/variant=USA keyboard-configuration/layoutcode=us localechooser/translation/warn-light=true localechooser/translation/warn-severe=true locale=en_US"
+	p.Kernel = m.ImageURL + m.Kernel
+	p.Initrd = []string{m.ImageURL + m.Initrd}
+
+	tpl, err := pongo2.FromString(m.Cmdline)
+	if err != nil {
+		return Pixie{}, err
+	}
+	out, err := tpl.Execute(pongo2.Context{"BaseURL": config.BaseURL, "Hostname": m.Hostname, "Token": m.Token})
+	if err != nil {
+		return Pixie{}, err
+	}
+	p.Cmdline = out
 
 	return p, nil
 }
