@@ -21,9 +21,6 @@ name | description
 templatepath | path where the _jinja2_ preseed, finish templates are located
 machinepath | path where the _yaml_ machine definitions are located
 baseurl | the url where this waitron instance will be listening
-image_url | the url where the image files (kernel+intrd) are located
-kernel | name of the kernel file for booting
-initrd | name of the initrd file for booting
 
 Extra parameters can be added in i.e. a params dictionari, those will be accessible in the templates as well
 
@@ -37,7 +34,3 @@ params.dns_servers | string containing the dns servers to be configured in the i
 ### API
 
 See **API.md** file in the repo
-
-
-
-
