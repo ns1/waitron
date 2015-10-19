@@ -218,7 +218,7 @@ func main() {
 	r.HandleFunc("/{hostname}/build",
 		func(response http.ResponseWriter, request *http.Request) {
 			buildHandler(response, request, configuration)
-		})
+		}).Methods("POST")
 	r.HandleFunc("/{hostname}/status",
 		func(response http.ResponseWriter, request *http.Request) {
 			hostStatus(response, request, configuration)
