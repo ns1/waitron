@@ -7,7 +7,7 @@ import (
 )
 
 func TestmachineDefinition(t *testing.T) {
-	m, err := machineDefinition("example.com", "machines")
+	m, err := machineDefinition("my-service.example.com", "machines")
 	if err != nil {
 		t.Errorf("Unable to load test machine definition")
 	}
@@ -21,9 +21,9 @@ func TestmachineDefinition(t *testing.T) {
 
 func TestRenderTemplate(t *testing.T) {
 	config, _ := loadConfig("config.yaml")
-	m, _ := machineDefinition("example.com", "machines")
+	m, _ := machineDefinition("my-service.example.com", "machines")
 
-	template, err := m.renderTemplate("pxe.j2", config)
+	template, err := m.renderTemplate("finish.j2", config)
 	if err != nil {
 		t.Errorf("failed to render template")
 	}
