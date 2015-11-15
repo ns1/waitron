@@ -4,10 +4,112 @@ Templates for server provisioning
 
 Table of Contents
 
+1. [Put the server in build mode](#build)
+1. [Removes the server from build mode](#done)
 1. [List machines handled by waitron](#list)
-1. [Dictionary with machines and its status](#status)
+1. [Build status of the server](#status)
+1. [Renders either the finish or the preseed template](#template)
 1. [Dictionary with kernel, intrd(s) and commandline for pixiecore](#v1)
-1. [Renders either the finish or the preseed template](#{hostname})
+
+<a name="build"></a>
+
+## build
+
+| Specification | Value |
+|-----|-----|
+| Resource Path | /build |
+| API Version |  |
+| BasePath for the API | {{.}} |
+| Consumes |  |
+| Produces |  |
+
+
+
+### Operations
+
+
+| Resource Path | Operation | Description |
+|-----|-----|-----|
+| build/\{hostname\} | [POST](#buildHandler) | Put the server in build mode |
+
+
+
+<a name="buildHandler"></a>
+
+#### API: build/\{hostname\} (POST)
+
+
+Put the server in build mode
+
+
+
+| Param Name | Param Type | Data Type | Description | Required? |
+|-----|-----|-----|-----|-----|
+| hostname | path | string | Hostname | Yes |
+
+
+| Code | Type | Model | Message |
+|-----|-----|-----|-----|
+| 200 | object | string | OK |
+| 500 | object | string | Unable to find host definition for hostname |
+| 500 | object | string | Failed to set build mode on hostname |
+
+
+
+
+### Models
+
+
+<a name="done"></a>
+
+## done
+
+| Specification | Value |
+|-----|-----|
+| Resource Path | /done |
+| API Version |  |
+| BasePath for the API | {{.}} |
+| Consumes |  |
+| Produces |  |
+
+
+
+### Operations
+
+
+| Resource Path | Operation | Description |
+|-----|-----|-----|
+| /done/\{hostname\}/\{token\} | [GET](#doneHandler) | Removes the server from build mode |
+
+
+
+<a name="doneHandler"></a>
+
+#### API: /done/\{hostname\}/\{token\} (GET)
+
+
+Removes the server from build mode
+
+
+
+| Param Name | Param Type | Data Type | Description | Required? |
+|-----|-----|-----|-----|-----|
+| hostname | path | string | Hostname | Yes |
+| token | path | string | Token | Yes |
+
+
+| Code | Type | Model | Message |
+|-----|-----|-----|-----|
+| 200 | object | string | OK |
+| 500 | object | string | Unable to find host definition for hostname |
+| 500 | object | string | Failed to cancel build mode |
+| 401 | object | string | Invalid token |
+
+
+
+
+### Models
+
 
 <a name="list"></a>
 
@@ -71,8 +173,29 @@ List machines handled by waitron
 
 | Resource Path | Operation | Description |
 |-----|-----|-----|
+| /status/\{hostname\} | [GET](#hostStatus) | Build status of the server |
 | /status | [GET](#status) | Dictionary with machines and its status |
 
+
+
+<a name="hostStatus"></a>
+
+#### API: /status/\{hostname\} (GET)
+
+
+Build status of the server
+
+
+
+| Param Name | Param Type | Data Type | Description | Required? |
+|-----|-----|-----|-----|-----|
+| hostname | path | string | Hostname | Yes |
+
+
+| Code | Type | Model | Message |
+|-----|-----|-----|-----|
+| 200 | object | string | The status: (installing or installed) |
+| 500 | object | string | Unknown state |
 
 
 <a name="status"></a>
@@ -87,6 +210,58 @@ Dictionary with machines and its status
 | Code | Type | Model | Message |
 |-----|-----|-----|-----|
 | 200 | object | string | Dictionary with machines and its status |
+
+
+
+
+### Models
+
+
+<a name="template"></a>
+
+## template
+
+| Specification | Value |
+|-----|-----|
+| Resource Path | /template |
+| API Version |  |
+| BasePath for the API | {{.}} |
+| Consumes |  |
+| Produces |  |
+
+
+
+### Operations
+
+
+| Resource Path | Operation | Description |
+|-----|-----|-----|
+| /template/\{template\}/\{hostname\}/\{token\} | [GET](#templateHandler) | Renders either the finish or the preseed template |
+
+
+
+<a name="templateHandler"></a>
+
+#### API: /template/\{template\}/\{hostname\}/\{token\} (GET)
+
+
+Renders either the finish or the preseed template
+
+
+
+| Param Name | Param Type | Data Type | Description | Required? |
+|-----|-----|-----|-----|-----|
+| hostname | path | string | Hostname | Yes |
+| template | path | string | The template to be rendered | Yes |
+| token | path | string | Token | Yes |
+
+
+| Code | Type | Model | Message |
+|-----|-----|-----|-----|
+| 200 | object | string | Rendered template |
+| 400 | object | string | Unable to find host definition for hostname |
+| 400 | object | string | Unable to render template |
+| 401 | object | string | Invalid token |
 
 
 
@@ -136,125 +311,6 @@ Dictionary with kernel, intrd(s) and commandline for pixiecore
 | 200 | object | string | Dictionary with kernel, intrd(s) and commandline for pixiecore |
 | 404 | object | string | Not in build mode |
 | 500 | object | string | Unable to find host definition for hostname |
-
-
-
-
-### Models
-
-
-<a name="{hostname}"></a>
-
-## {hostname}
-
-| Specification | Value |
-|-----|-----|
-| Resource Path | /{hostname} |
-| API Version |  |
-| BasePath for the API | {{.}} |
-| Consumes |  |
-| Produces |  |
-
-
-
-### Operations
-
-
-| Resource Path | Operation | Description |
-|-----|-----|-----|
-| \{hostname\}/\{template\}/\{token\} | [GET](#templateHandler) | Renders either the finish or the preseed template |
-| /\{hostname\}/build | [GET](#buildHandler) | Put the server in build mode |
-| /\{hostname\}/done/\{token\} | [GET](#doneHandler) | Removes the server from build mode |
-| /\{hostname\}/status | [GET](#hostStatus) | Build status of the server |
-
-
-
-<a name="templateHandler"></a>
-
-#### API: \{hostname\}/\{template\}/\{token\} (GET)
-
-
-Renders either the finish or the preseed template
-
-
-
-| Param Name | Param Type | Data Type | Description | Required? |
-|-----|-----|-----|-----|-----|
-| hostname | path | string | Hostname | Yes |
-| template | path | string | The template to be rendered | Yes |
-| token | path | string | Token | Yes |
-
-
-| Code | Type | Model | Message |
-|-----|-----|-----|-----|
-| 200 | object | string | Rendered template |
-| 400 | object | string | Unable to find host definition for hostname |
-| 400 | object | string | Unable to render template |
-| 401 | object | string | Invalid token |
-
-
-<a name="buildHandler"></a>
-
-#### API: /\{hostname\}/build (GET)
-
-
-Put the server in build mode
-
-
-
-| Param Name | Param Type | Data Type | Description | Required? |
-|-----|-----|-----|-----|-----|
-| hostname | path | string | Hostname | Yes |
-
-
-| Code | Type | Model | Message |
-|-----|-----|-----|-----|
-| 200 | object | string | OK |
-| 500 | object | string | Unable to find host definition for hostname |
-| 500 | object | string | Failed to set build mode on hostname |
-
-
-<a name="doneHandler"></a>
-
-#### API: /\{hostname\}/done/\{token\} (GET)
-
-
-Removes the server from build mode
-
-
-
-| Param Name | Param Type | Data Type | Description | Required? |
-|-----|-----|-----|-----|-----|
-| hostname | path | string | Hostname | Yes |
-| token | path | string | Token | Yes |
-
-
-| Code | Type | Model | Message |
-|-----|-----|-----|-----|
-| 200 | object | string | OK |
-| 500 | object | string | Unable to find host definition for hostname |
-| 500 | object | string | Failed to cancel build mode |
-| 401 | object | string | Invalid token |
-
-
-<a name="hostStatus"></a>
-
-#### API: /\{hostname\}/status (GET)
-
-
-Build status of the server
-
-
-
-| Param Name | Param Type | Data Type | Description | Required? |
-|-----|-----|-----|-----|-----|
-| hostname | path | string | Hostname | Yes |
-
-
-| Code | Type | Model | Message |
-|-----|-----|-----|-----|
-| 200 | object | string | The status: (installing or installed) |
-| 500 | object | string | Unknown state |
 
 
 
