@@ -1,5 +1,0 @@
-default linux
-label linux
-kernel boot/Ubuntu-14.04-x86_64-linux
-append initrd=boot/Ubuntu-14.04-x86_64-initrd.gz interface=auto url={{config.BaseURL}}/{{machine.Hostname}}/preseed/{{machine.Token}} ramdisk_size=10800 root=/dev/rd/0 rw auto hostname={{machine.Hostname}} console-setup/ask_detect=false console-setup/layout=USA console-setup/variant=USA keyboard-configuration/layoutcode=us localechooser/translation/warn-light=true localechooser/translation/warn-severe=true locale=en_US
-IPAPPEND 2
