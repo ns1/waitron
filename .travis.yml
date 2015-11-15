@@ -2,4 +2,6 @@ language: go
 
 go:
   - tip
-
+addons:
+  code_climate:
+    repo_token: 119d0eab6c1b6c20ed99f7be505fc2bbde81520f1da2fc7618246010d6c3657d
