@@ -30,7 +30,7 @@ type result struct {
 // @Failure 400	{object} string "Unable to find host definition for hostname"
 // @Failure 400	{object} string "Unable to render template"
 // @Failure 401	{object} string "Invalid token"
-// @Router {hostname}/{template}/{token} [get]
+// @Router /template/{template}/{hostname}/{token} [get]
 func templateHandler(response http.ResponseWriter, request *http.Request,
 	ps httprouter.Params,
 	config Config) {
@@ -75,7 +75,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 // @Success 200	{object} string "OK"
 // @Failure 500	{object} string "Unable to find host definition for hostname"
 // @Failure 500	{object} string "Failed to set build mode on hostname"
-// @Router /{hostname}/build [get]
+// @Router build/{hostname} [post]
 func buildHandler(response http.ResponseWriter, request *http.Request,
 	ps httprouter.Params, config Config) {
 	hostname := ps.ByName("hostname")
@@ -105,7 +105,7 @@ func buildHandler(response http.ResponseWriter, request *http.Request,
 // @Failure 500	{object} string "Unable to find host definition for hostname"
 // @Failure 500	{object} string "Failed to cancel build mode"
 // @Failure 401	{object} string "Invalid token"
-// @Router /{hostname}/done/{token} [get]
+// @Router /done/{hostname}/{token} [get]
 func doneHandler(response http.ResponseWriter, request *http.Request,
 	ps httprouter.Params, config Config) {
 	hostname := ps.ByName("hostname")
@@ -136,7 +136,7 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
 // @Param hostname	path	string	true	"Hostname"
 // @Success 200	{object} string "The status: (installing or installed)"
 // @Failure 500	{object} string "Unknown state"
-// @Router /{hostname}/status [get]
+// @Router /status/{hostname} [get]
 func hostStatus(response http.ResponseWriter, request *http.Request,
 	ps httprouter.Params, config Config) {
 	status := config.MachineState[ps.ByName("hostname")]
