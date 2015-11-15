@@ -1,6 +1,5 @@
 # waitron
-[![Build Status](https://travis-ci.org/jhaals/waitron.svg)](https://travis-ci.org/jhaals/waitron)
-
+[![Build Status](https://travis-ci.org/jhaals/waitron.svg?branch=master)](https://travis-ci.org/jhaals/waitron)
 Waitron reads the machine definition from YAML and templates preseed and finish scripts based on that data. When a server is set in _build mode_ waitron will deliver a kernel/initrd/commandline used by [pixiecore](https://github.com/danderson/pixiecore) (in API mode) to boot and install the machine.
 
 Run in docker container
