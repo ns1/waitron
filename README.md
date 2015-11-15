@@ -1,5 +1,7 @@
 # waitron
-Waitron reads the machine definition from YAML and templates preseed and finish scripts based on that data. When a server is set in _build_ mode waitron will deliver a kernel/initrd/commandline set to be used by [pixiecore](https://github.com/danderson/pixiecore) (in API mode) to boot and install the machine.
+[![Build Status](https://travis-ci.org/jhaals/waitron.svg)](https://travis-ci.org/jhaals/waitron)
+
+Waitron reads the machine definition from YAML and templates preseed and finish scripts based on that data. When a server is set in _build mode_ waitron will deliver a kernel/initrd/commandline used by [pixiecore](https://github.com/danderson/pixiecore) (in API mode) to boot and install the machine.
 
 Run in docker container
 
@@ -9,12 +11,10 @@ Run in docker container
 
 Run locally
 
-    export CONFIG_FILE=config.yaml && go build . && ./waitron
-
+    go build . && CONFIG_FILE=config.yaml ./waitron
 
 ### config file
 The config file needs a minimum set of parameters which will be available in the templates as **config._value_**.
-
 
 name | description
 --- | ---
@@ -24,12 +24,9 @@ baseurl | the url where this waitron instance will be listening
 
 Extra parameters can be added in i.e. a params dictionari, those will be accessible in the templates as well
 
-
-
 name | description
 --- | ---
 params.dns_servers | string containing the dns servers to be configured in the installed machines
-
 
 ### API
 
