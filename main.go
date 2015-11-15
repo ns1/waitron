@@ -12,7 +12,7 @@ import (
 	"os"
 
 	"github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
+	"github.com/julienschmidt/httprouter"
 )
 
 type result struct {
@@ -32,8 +32,9 @@ type result struct {
 // @Failure 401	{object} string "Invalid token"
 // @Router {hostname}/{template}/{token} [get]
 func templateHandler(response http.ResponseWriter, request *http.Request,
+	ps httprouter.Params,
 	config Config) {
-	hostname := mux.Vars(request)["hostname"]
+	hostname := ps.ByName("hostname")
 
 	m, err := machineDefinition(hostname, config.MachinePath)
 	if err != nil {
@@ -42,7 +43,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 		return
 	}
 
-	if mux.Vars(request)["token"] != config.Token[hostname] {
+	if ps.ByName("token") != config.Token[hostname] {
 		http.Error(response, "Invalid Token", 401)
 		return
 	}
@@ -52,7 +53,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 
 	// Render preseed as default
 	var template string
-	if mux.Vars(request)["template"] == "finish" {
+	if ps.ByName("template") == "finish" {
 		template = m.Finish
 	} else {
 		template = m.Preseed
@@ -75,8 +76,9 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 // @Failure 500	{object} string "Unable to find host definition for hostname"
 // @Failure 500	{object} string "Failed to set build mode on hostname"
 // @Router /{hostname}/build [get]
-func buildHandler(response http.ResponseWriter, request *http.Request, config Config) {
-	hostname := mux.Vars(request)["hostname"]
+func buildHandler(response http.ResponseWriter, request *http.Request,
+	ps httprouter.Params, config Config) {
+	hostname := ps.ByName("hostname")
 
 	m, err := machineDefinition(hostname, config.MachinePath)
 	if err != nil {
@@ -104,8 +106,9 @@ func buildHandler(response http.ResponseWriter, request *http.Request, config Co
 // @Failure 500	{object} string "Failed to cancel build mode"
 // @Failure 401	{object} string "Invalid token"
 // @Router /{hostname}/done/{token} [get]
-func doneHandler(response http.ResponseWriter, request *http.Request, config Config) {
-	hostname := mux.Vars(request)["hostname"]
+func doneHandler(response http.ResponseWriter, request *http.Request,
+	ps httprouter.Params, config Config) {
+	hostname := ps.ByName("hostname")
 	m, err := machineDefinition(hostname, config.MachinePath)
 	if err != nil {
 		log.Println(err)
@@ -113,7 +116,7 @@ func doneHandler(response http.ResponseWriter, request *http.Request, config Con
 		return
 	}
 
-	if mux.Vars(request)["token"] != config.Token[hostname] {
+	if ps.ByName("token") != config.Token[hostname] {
 		http.Error(response, "Invalid Token", 401)
 		return
 	}
@@ -134,8 +137,9 @@ func doneHandler(response http.ResponseWriter, request *http.Request, config Con
 // @Success 200	{object} string "The status: (installing or installed)"
 // @Failure 500	{object} string "Unknown state"
 // @Router /{hostname}/status [get]
-func hostStatus(response http.ResponseWriter, request *http.Request, config Config) {
-	status := config.MachineState[mux.Vars(request)["hostname"]]
+func hostStatus(response http.ResponseWriter, request *http.Request,
+	ps httprouter.Params, config Config) {
+	status := config.MachineState[ps.ByName("hostname")]
 	if status == "" {
 		http.Error(response, "Unknown state", 500)
 		return
@@ -148,7 +152,8 @@ func hostStatus(response http.ResponseWriter, request *http.Request, config Conf
 // @Success 200	{array} string "List of machines"
 // @Failure 500	{object} string "Unable to list machines"
 // @Router /list [get]
-func listMachinesHandler(response http.ResponseWriter, request *http.Request, config Config) {
+func listMachinesHandler(response http.ResponseWriter, request *http.Request,
+	ps httprouter.Params, config Config) {
 	machines, err := config.listMachines()
 	if err != nil {
 		log.Println(err)
@@ -163,7 +168,8 @@ func listMachinesHandler(response http.ResponseWriter, request *http.Request, co
 // @Description Dictionary with machines and its status
 // @Success 200	{object} string "Dictionary with machines and its status"
 // @Router /status [get]
-func status(response http.ResponseWriter, request *http.Request, config Config) {
+func status(response http.ResponseWriter, request *http.Request,
+	ps httprouter.Params, config Config) {
 	result, _ := json.Marshal(&config.MachineState)
 	response.Write(result)
 }
@@ -175,9 +181,10 @@ func status(response http.ResponseWriter, request *http.Request, config Config) 
 // @Failure 404	{object} string "Not in build mode"
 // @Failure 500	{object} string "Unable to find host definition for hostname"
 // @Router /v1/boot/{macaddr} [get]
-func pixieHandler(response http.ResponseWriter, request *http.Request, config Config) {
+func pixieHandler(response http.ResponseWriter, request *http.Request,
+	ps httprouter.Params, config Config) {
 
-	macaddr := mux.Vars(request)["macaddr"]
+	macaddr := ps.ByName("macaddr")
 	hostname, found := config.MachineBuild[macaddr]
 
 	if found == false {
@@ -213,35 +220,34 @@ func main() {
 		log.Fatal(err)
 	}
 
-	r := mux.NewRouter()
-	s := r.PathPrefix("/v1/").Subrouter()
-	r.HandleFunc("/{hostname}/build",
-		func(response http.ResponseWriter, request *http.Request) {
-			buildHandler(response, request, configuration)
-		}).Methods("POST")
-	r.HandleFunc("/{hostname}/status",
-		func(response http.ResponseWriter, request *http.Request) {
-			hostStatus(response, request, configuration)
+	r := httprouter.New()
+	r.GET("/list",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			listMachinesHandler(response, request, ps, configuration)
 		})
-	r.HandleFunc("/status",
-		func(response http.ResponseWriter, request *http.Request) {
-			status(response, request, configuration)
+	r.POST("/build/:hostname",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			buildHandler(response, request, ps, configuration)
 		})
-	r.HandleFunc("/list",
-		func(response http.ResponseWriter, request *http.Request) {
-			listMachinesHandler(response, request, configuration)
+	r.GET("/status/:hostname",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			hostStatus(response, request, ps, configuration)
 		})
-	r.HandleFunc("/{hostname}/done/{token}",
-		func(response http.ResponseWriter, request *http.Request) {
-			doneHandler(response, request, configuration)
+	r.GET("/status",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			status(response, request, ps, configuration)
 		})
-	r.HandleFunc("/{hostname}/{template}/{token}",
-		func(response http.ResponseWriter, request *http.Request) {
-			templateHandler(response, request, configuration)
+	r.GET("/done/:hostname/:token",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			doneHandler(response, request, ps, configuration)
 		})
-	s.HandleFunc("/boot/{macaddr}",
-		func(response http.ResponseWriter, request *http.Request) {
-			pixieHandler(response, request, configuration)
+	r.GET("/template/:template/:hostname/:token",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			templateHandler(response, request, ps, configuration)
+		})
+	r.GET("/v1/boot/:macaddr",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			pixieHandler(response, request, ps, configuration)
 		})
 
 	log.Println("Starting Server")

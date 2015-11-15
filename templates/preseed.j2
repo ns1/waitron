@@ -77,5 +77,4 @@ xserver-xorg xserver-xorg/config/monitor/mode-list \
        select 1024x768 @ 60 Hz
 
 # Fetch and run finish script from waitron
-d-i preseed/late_command string wget -Y off {{config.BaseURL}}/{{machine.Hostname}}/finish/{{machine.Token}} -O /target/tmp/finish.sh && in-target chmod +x /tmp/finish.sh && in-target /tmp/finish.sh
-
+d-i preseed/late_command string wget -Y off {{config.BaseURL}}/template/finish/{{machine.Hostname}}/{{machine.Token}} -O /target/tmp/finish.sh && in-target chmod +x /tmp/finish.sh && in-target /tmp/finish.sh
