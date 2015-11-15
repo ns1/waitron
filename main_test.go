@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestNotInBuild(t *testing.T) {
+func TestInvalidBootConfiguration(t *testing.T) {
 	request, _ := http.NewRequest("GET", "/boot/11:22:33:44:51", nil)
 	response := httptest.NewRecorder()
 	configuration, _ := loadConfig("config.yaml")
@@ -24,7 +24,7 @@ func TestNotInBuild(t *testing.T) {
 	}
 }
 
-func TestInBuild(t *testing.T) {
+func TestBootConfiguration(t *testing.T) {
 	request, _ := http.NewRequest("GET", "/boot/00:11:44:24:50", nil)
 	response := httptest.NewRecorder()
 	configuration, _ := loadConfig("config.yaml")
