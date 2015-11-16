@@ -20,3 +20,29 @@ func TestInvalidConfig(t *testing.T) {
 		t.Errorf("No error presented when invalid configuration is loaded")
 	}
 }
+
+func TestInvalidYAMLConfig(t *testing.T) {
+	_, err := loadConfig("README.md")
+	if err == nil {
+		t.Errorf("No error presented when invalid configuration is loaded")
+	}
+}
+
+func TestListMachines(t *testing.T) {
+	c, _ := loadConfig("config.yaml")
+	machines, err := c.listMachines()
+	if err != nil {
+		t.Errorf("Failed to list machines")
+	}
+	if machines[0] == "my-service.example.com" {
+		t.Errorf("expected my-service.example.com in machine list")
+	}
+}
+
+func TestListMachinesWithInvalidPath(t *testing.T) {
+	c := Config{MachinePath: "invalid"}
+	_, err := c.listMachines()
+	if err == nil {
+		t.Errorf("Invalid machine path should throw errors")
+	}
+}
