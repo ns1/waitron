@@ -153,7 +153,7 @@ func hostStatus(response http.ResponseWriter, request *http.Request,
 // @Failure 500	{object} string "Unable to list machines"
 // @Router /list [get]
 func listMachinesHandler(response http.ResponseWriter, request *http.Request,
-	ps httprouter.Params, config Config) {
+	_ httprouter.Params, config Config) {
 	machines, err := config.listMachines()
 	if err != nil {
 		log.Println(err)

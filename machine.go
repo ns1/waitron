@@ -39,7 +39,7 @@ type Interface struct {
 	Netmask    string
 }
 
-// PXE boot configuration
+// Pixie boot configuration
 type Pixie struct {
 	Kernel  string   `json:"kernel" description:"The kernel file"`
 	Initrd  []string `json:"initrd"`
