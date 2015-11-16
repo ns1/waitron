@@ -43,13 +43,13 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 		return
 	}
 
-	if ps.ByName("token") != config.Token[hostname] {
+	if ps.ByName("token") != config.Tokens[hostname] {
 		http.Error(response, "Invalid Token", 401)
 		return
 	}
 
 	// Set token used in template
-	m.Token = config.Token[hostname]
+	m.Token = config.Tokens[hostname]
 
 	// Render preseed as default
 	var template string
@@ -116,7 +116,7 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
 		return
 	}
 
-	if ps.ByName("token") != config.Token[hostname] {
+	if ps.ByName("token") != config.Tokens[hostname] {
 		http.Error(response, "Invalid Token", 401)
 		return
 	}
@@ -195,7 +195,7 @@ func pixieHandler(response http.ResponseWriter, request *http.Request,
 
 	m, err := machineDefinition(hostname, config.MachinePath)
 
-	m.Token = config.Token[hostname]
+	m.Token = config.Tokens[hostname]
 
 	if err != nil {
 		log.Println(err)
