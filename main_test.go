@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestInvalidBootConfiguration(t *testing.T) {
+func TestPixieHandlerNotInBuildMode(t *testing.T) {
 	request, _ := http.NewRequest("GET", "/boot/11:22:33:44:51", nil)
 	response := httptest.NewRecorder()
 	configuration, _ := loadConfig("config.yaml")
@@ -24,7 +24,7 @@ func TestInvalidBootConfiguration(t *testing.T) {
 	}
 }
 
-func TestBootConfiguration(t *testing.T) {
+func TestPixieHandler(t *testing.T) {
 	request, _ := http.NewRequest("GET", "/boot/00:11:44:24:50", nil)
 	response := httptest.NewRecorder()
 	configuration, _ := loadConfig("config.yaml")
@@ -33,6 +33,38 @@ func TestBootConfiguration(t *testing.T) {
 
 	pixieHandler(response, request, ps, configuration)
 	expected := "hostname=my-service.example.com"
+	if !strings.Contains(response.Body.String(), expected) {
+		t.Errorf("Reponse body is %s, expected %s", response.Body, expected)
+	}
+	if response.Code != http.StatusOK {
+		t.Errorf("Response code is %v, should be 200", response.Code)
+	}
+}
+
+func TestPixieHandlerNoMachineDefinition(t *testing.T) {
+	request, _ := http.NewRequest("GET", "/boot/00:11:44:24:50", nil)
+	response := httptest.NewRecorder()
+	configuration, _ := loadConfig("config.yaml")
+	ps := httprouter.Params{httprouter.Param{Key: "macaddr", Value: "00:11:44:24:50"}}
+	configuration.MachineBuild["00:11:44:24:50"] = "this.is.incorrect"
+
+	pixieHandler(response, request, ps, configuration)
+	expected := "Unable to find host definition"
+	if !strings.Contains(response.Body.String(), expected) {
+		t.Errorf("Reponse body is %s, expected %s", response.Body, expected)
+	}
+	if response.Code != http.StatusInternalServerError {
+		t.Errorf("Response code is %v, should be 200", response.Code)
+	}
+}
+
+func TestMachinesHandlerList(t *testing.T) {
+	request, _ := http.NewRequest("GET", "/list", nil)
+	response := httptest.NewRecorder()
+	configuration, _ := loadConfig("config.yaml")
+
+	listMachinesHandler(response, request, nil, configuration)
+	expected := `["my-service.example.com.yaml"]`
 	if !strings.Contains(response.Body.String(), expected) {
 		t.Errorf("Reponse body is %s, expected %s", response.Body, expected)
 	}
