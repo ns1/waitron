@@ -30,7 +30,7 @@ type result struct {
 // @Failure 400	{object} string "Unable to find host definition for hostname"
 // @Failure 400	{object} string "Unable to render template"
 // @Failure 401	{object} string "Invalid token"
-// @Router /template/{template}/{hostname}/{token} [get]
+// @Router /template/{template}/{hostname}/{token} [GET]
 func templateHandler(response http.ResponseWriter, request *http.Request,
 	ps httprouter.Params,
 	config Config) {
@@ -75,7 +75,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 // @Success 200	{object} string "OK"
 // @Failure 500	{object} string "Unable to find host definition for hostname"
 // @Failure 500	{object} string "Failed to set build mode on hostname"
-// @Router build/{hostname} [post]
+// @Router build/{hostname} [PUT]
 func buildHandler(response http.ResponseWriter, request *http.Request,
 	ps httprouter.Params, config Config) {
 	hostname := ps.ByName("hostname")
@@ -105,7 +105,7 @@ func buildHandler(response http.ResponseWriter, request *http.Request,
 // @Failure 500	{object} string "Unable to find host definition for hostname"
 // @Failure 500	{object} string "Failed to cancel build mode"
 // @Failure 401	{object} string "Invalid token"
-// @Router /done/{hostname}/{token} [get]
+// @Router /done/{hostname}/{token} [GET]
 func doneHandler(response http.ResponseWriter, request *http.Request,
 	ps httprouter.Params, config Config) {
 	hostname := ps.ByName("hostname")
@@ -136,7 +136,7 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
 // @Param hostname	path	string	true	"Hostname"
 // @Success 200	{object} string "The status: (installing or installed)"
 // @Failure 500	{object} string "Unknown state"
-// @Router /status/{hostname} [get]
+// @Router /status/{hostname} [GET]
 func hostStatus(response http.ResponseWriter, request *http.Request,
 	ps httprouter.Params, config Config) {
 	status := config.MachineState[ps.ByName("hostname")]
@@ -151,7 +151,7 @@ func hostStatus(response http.ResponseWriter, request *http.Request,
 // @Description List machines handled by waitron
 // @Success 200	{array} string "List of machines"
 // @Failure 500	{object} string "Unable to list machines"
-// @Router /list [get]
+// @Router /list [GET]
 func listMachinesHandler(response http.ResponseWriter, request *http.Request,
 	_ httprouter.Params, config Config) {
 	machines, err := config.listMachines()
@@ -167,7 +167,7 @@ func listMachinesHandler(response http.ResponseWriter, request *http.Request,
 // @Title status
 // @Description Dictionary with machines and its status
 // @Success 200	{object} string "Dictionary with machines and its status"
-// @Router /status [get]
+// @Router /status [GET]
 func status(response http.ResponseWriter, request *http.Request,
 	ps httprouter.Params, config Config) {
 	result, _ := json.Marshal(&config.MachineState)
@@ -180,7 +180,7 @@ func status(response http.ResponseWriter, request *http.Request,
 // @Success 200	{object} string "Dictionary with kernel, intrd(s) and commandline for pixiecore"
 // @Failure 404	{object} string "Not in build mode"
 // @Failure 500	{object} string "Unable to find host definition for hostname"
-// @Router /v1/boot/{macaddr} [get]
+// @Router /v1/boot/{macaddr} [GET]
 func pixieHandler(response http.ResponseWriter, request *http.Request,
 	ps httprouter.Params, config Config) {
 
@@ -225,7 +225,7 @@ func main() {
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			listMachinesHandler(response, request, ps, configuration)
 		})
-	r.POST("/build/:hostname",
+	r.PUT("/build/:hostname",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			buildHandler(response, request, ps, configuration)
 		})

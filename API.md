@@ -30,13 +30,13 @@ Table of Contents
 
 | Resource Path | Operation | Description |
 |-----|-----|-----|
-| build/\{hostname\} | [POST](#buildHandler) | Put the server in build mode |
+| build/\{hostname\} | [PUT](#buildHandler) | Put the server in build mode |
 
 
 
 <a name="buildHandler"></a>
 
-#### API: build/\{hostname\} (POST)
+#### API: build/\{hostname\} (PUT)
 
 
 Put the server in build mode
