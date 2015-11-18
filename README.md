@@ -6,7 +6,7 @@ Waitron reads the machine definition from YAML and templates preseed and finish 
 Run in docker container
 
     docker run -v /path/to/data:/data \
-        -e CONFIG_FILE=/data/config.yaml
+        -e CONFIG_FILE=/data/config.yaml \
         jhaals/waitron
 
 Run locally
@@ -30,4 +30,4 @@ params.dns_servers | string containing the dns servers to be configured in the i
 
 ### API
 
-See **API.md** file in the repo
+See [API.md](API.md) file in the repo
