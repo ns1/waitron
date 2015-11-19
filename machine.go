@@ -39,8 +39,8 @@ type Interface struct {
 	Netmask    string
 }
 
-// Pixie boot configuration
-type Pixie struct {
+// PixieConfig boot configuration
+type PixieConfig struct {
 	Kernel  string   `json:"kernel" description:"The kernel file"`
 	Initrd  []string `json:"initrd"`
 	Cmdline string   `json:"cmdline"`
@@ -92,32 +92,27 @@ func (m Machine) setBuildMode(config Config) error {
 	return nil
 }
 
-// Sends DELETE to the forman-proxy tftp API removing the pxe configuration
+/*
+cancelBuild remove the machines mac address from the MachineBuild map
+which stops waitron from serving the PixieConfig used by pixiecore
+*/
 func (m Machine) cancelBuildMode(config Config) error {
 	//Delete mac from the building map
 	delete(config.MachineBuild, fmt.Sprintf("%s", m.Network[0].MacAddress))
 	//Change machine state
 	config.MachineState[m.Hostname] = "Installed"
-
 	return nil
 }
 
 // Builds pxe config to be sent to pixiecore
-func (m Machine) pixieInit(config Config) (Pixie, error) {
-	var p Pixie
-
-	p.Kernel = m.ImageURL + m.Kernel
-	p.Initrd = []string{m.ImageURL + m.Initrd}
-
+func (m Machine) pixieInit(config Config) (PixieConfig, error) {
 	tpl, err := pongo2.FromString(m.Cmdline)
 	if err != nil {
-		return Pixie{}, err
+		return PixieConfig{}, err
 	}
-	out, err := tpl.Execute(pongo2.Context{"BaseURL": config.BaseURL, "Hostname": m.Hostname, "Token": m.Token})
+	cmdline, err := tpl.Execute(pongo2.Context{"BaseURL": config.BaseURL, "Hostname": m.Hostname, "Token": m.Token})
 	if err != nil {
-		return Pixie{}, err
+		return PixieConfig{}, err
 	}
-	p.Cmdline = out
-
-	return p, nil
+	return PixieConfig{Kernel: m.ImageURL + m.Kernel, Initrd: []string{m.ImageURL + m.Initrd}, Cmdline: cmdline}, nil
 }
