@@ -33,3 +33,14 @@ func TestRenderTemplate(t *testing.T) {
 		t.Errorf(fmt.Sprintf("Template does not contain '%s'", expected))
 	}
 }
+
+func TestRenderTemplateNotFound(t *testing.T) {
+	config, _ := loadConfig("config.yaml")
+	m, _ := machineDefinition("my-service.example.com", "machines")
+	_, err := m.renderTemplate("invalid.j2", config)
+
+	expected := "Template does not exist"
+	if err.Error() != expected {
+		t.Errorf(fmt.Sprintf("Expected: %s, got: %s", expected, err.Error()))
+	}
+}
