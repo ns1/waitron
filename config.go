@@ -12,7 +12,10 @@ type Config struct {
 	MachinePath         string
 	BaseURL             string
 	ForemanProxyAddress string `yaml:"foreman_proxy_address"`
-	PXEConfig           string `yaml:"pxe_config"`
+	DefaultCmdline      string `yaml:"default_cmdline"`
+	DefaultKernel       string `yaml:"default_kernel"`
+	DefaultInitrd       string `yaml:"default_initrd"`
+	DefaultImageURL     string `yaml:"default_image_url"`
 	Params              map[string]string
 	Tokens              map[string]string
 	MachineState        map[string]string
