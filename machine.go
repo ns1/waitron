@@ -104,15 +104,27 @@ func (m Machine) cancelBuildMode(config Config) error {
 	return nil
 }
 
+// Return string2 if string1 is empty
+func defaultString(string1 string, string2 string) string {
+	if string1 == "" {
+		return string2
+	}
+	return string1
+}
+
 // Builds pxe config to be sent to pixiecore
 func (m Machine) pixieInit(config Config) (PixieConfig, error) {
-	tpl, err := pongo2.FromString(m.Cmdline)
+	pixieConfig := PixieConfig{}
+	tpl, err := pongo2.FromString(defaultString(m.Cmdline, config.DefaultCmdline))
 	if err != nil {
-		return PixieConfig{}, err
+		return pixieConfig, err
 	}
 	cmdline, err := tpl.Execute(pongo2.Context{"BaseURL": config.BaseURL, "Hostname": m.Hostname, "Token": m.Token})
 	if err != nil {
-		return PixieConfig{}, err
+		return pixieConfig, err
 	}
-	return PixieConfig{Kernel: m.ImageURL + m.Kernel, Initrd: []string{m.ImageURL + m.Initrd}, Cmdline: cmdline}, nil
+	pixieConfig.Kernel = defaultString(m.ImageURL+m.Kernel, config.DefaultImageURL+config.DefaultKernel)
+	pixieConfig.Initrd = []string{defaultString(m.ImageURL+m.Initrd, config.DefaultImageURL+config.DefaultInitrd)}
+	pixieConfig.Cmdline = cmdline
+	return pixieConfig, nil
 }

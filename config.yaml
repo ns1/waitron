@@ -3,3 +3,7 @@ machinepath: machines
 baseurl: http://127.0.0.1:9090
 params:
     hello: world
+default_cmdline: "interface=auto url={{ BaseURL }}/{{ Hostname }}/preseed/{{ Token }} ramdisk_size=10800 root=/dev/rd/0 rw auto hostname={{ Hostname }} console-setup/ask_detect=false console-setup/layout=USA console-setup/variant=USA keyboard-configuration/layoutcode=us localechooser/translation/warn-light=true localechooser/translation/warn-severe=true locale=en_US"
+default_kernel: linux
+default_image_url: http://archive.ubuntu.com/ubuntu/dists/trusty-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/
+default_initrd: initrd.gz
