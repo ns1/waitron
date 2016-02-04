@@ -34,6 +34,7 @@ type result struct {
 func templateHandler(response http.ResponseWriter, request *http.Request,
 	ps httprouter.Params,
 	config Config) {
+
 	hostname := ps.ByName("hostname")
 
 	m, err := machineDefinition(hostname, config.MachinePath)
@@ -53,10 +54,21 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 
 	// Render preseed as default
 	var template string
-	if ps.ByName("template") == "finish" {
-		template = m.Finish
-	} else {
+
+	switch ps.ByName("template") {
+	case "preseed":
 		template = m.Preseed
+	case "finish":
+		template = m.Finish
+	case "cloud-init":
+		renderedTemplate, err := m.renderCloudInit(hostname, config)
+		if err != nil {
+			log.Println(err)
+			http.Error(response, "Unable to render template", 400)
+			return
+		}
+		fmt.Fprintf(response, renderedTemplate)
+		return
 	}
 
 	renderedTemplate, err := m.renderTemplate(template, config)
