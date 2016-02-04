@@ -28,6 +28,16 @@ type Machine struct {
 	Kernel          string
 	Initrd          string
 	Cmdline         string
+	Roles           []string
+	PubKeys         []string `yaml:"pub_keys"`
+	Ipmi            []Ipmi
+}
+
+// IPMI Configuration
+type Ipmi struct {
+	IPAddress  string
+	MacAddress string
+	Md5        string
 }
 
 // Interface Configuration
