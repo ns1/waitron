@@ -1,5 +1,6 @@
 templatepath: templates
 machinepath: machines
+hookpath: hooks
 baseurl: http://127.0.0.1:9090
 params:
     hello: world
@@ -7,3 +8,10 @@ default_cmdline: "interface=auto url={{ BaseURL }}/{{ Hostname }}/preseed/{{ Tok
 default_kernel: linux
 default_image_url: http://archive.ubuntu.com/ubuntu/dists/trusty-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/
 default_initrd: initrd.gz
+pre_hooks:
+  - notify-slack.sh
+
+post_hooks:
+  - notify-slack.sh
+#  - update-route53.sh
+#  - enable-monitoring.sh

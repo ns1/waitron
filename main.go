@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 
 	"github.com/gorilla/handlers"
 	"github.com/julienschmidt/httprouter"
@@ -62,18 +63,20 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 
 	switch ps.ByName("template") {
 	case "preseed":
-		template = m.Preseed
-	case "finish":
-		template = m.Finish
-	case "cloud-init":
-		renderedTemplate, err := m.renderCloudInit(hostname, config)
+		template = path.Join(config.TemplatePath, m.Preseed)
+
+		hookType := "pre-hook"
+		err = executeHooks(hookType, m, config)
 		if err != nil {
 			log.Println(err)
-			http.Error(response, "Unable to render template", http.StatusInternalServerError)
+			http.Error(response, fmt.Sprintf("Cannot execute pre hooks for: ", hostname), 500)
 			return
 		}
-		fmt.Fprintf(response, renderedTemplate)
-		return
+
+	case "finish":
+		template = path.Join(config.TemplatePath, m.Finish)
+	case "cloud-init":
+		template = path.Join(config.MachinePath, hostname+".cloud-init")
 	}
 
 	renderedTemplate, err := m.renderTemplate(template, config)
@@ -170,6 +173,15 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
 		http.Error(response, "Failed to cancel build mode", 500)
 		return
 	}
+
+	hookType := "post-hook"
+	err = executeHooks(hookType, m, config)
+	if err != nil {
+		log.Println(err)
+		http.Error(response, fmt.Sprintf("Cannot execute post hooks for: ", hostname), 500)
+		return
+	}
+
 	response.Header().Set("content-type", "application/json")
 	msg := HttpResponse{"ok", http.StatusOK}
 	js, err := json.Marshal(msg)
@@ -206,6 +218,24 @@ func listMachinesHandler(response http.ResponseWriter, request *http.Request,
 		return
 	}
 	js, _ := json.Marshal(machines)
+	response.Header().Set("content-type", "application/json")
+	response.Write(js)
+}
+
+// @Title listHooksHandler
+// @Description List all available pre- and post hooks
+// @Success 200 {array} string "List of hooks"
+// @Failure 500 {object} string "Unable to list hooks"
+// @Router /hooks [GET]
+func listHooksHandler(response http.ResponseWriter, request *http.Request,
+	_ httprouter.Params, config Config) {
+	hooks, err := config.listHooks()
+	if err != nil {
+		log.Println(err)
+		http.Error(response, "Unable to list hooks", 500)
+		return
+	}
+	js, _ := json.Marshal(hooks)
 	response.Header().Set("content-type", "application/json")
 	response.Write(js)
 }
@@ -272,6 +302,10 @@ func main() {
 	r.GET("/list",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			listMachinesHandler(response, request, ps, configuration)
+		})
+	r.GET("/hooks",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			listHooksHandler(response, request, ps, configuration)
 		})
 	r.PUT("/build/:hostname",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {

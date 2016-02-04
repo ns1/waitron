@@ -10,6 +10,7 @@ import (
 type Config struct {
 	TemplatePath    string
 	MachinePath     string
+	HookPath        string
 	BaseURL         string
 	DefaultCmdline  string `yaml:"default_cmdline"`
 	DefaultKernel   string `yaml:"default_kernel"`
@@ -19,6 +20,8 @@ type Config struct {
 	Tokens          map[string]string
 	MachineState    map[string]string
 	MachineBuild    map[string]string
+	PreHooks        []string `yaml:"pre_hooks"`
+	PostHooks       []string `yaml:"post_hooks"`
 }
 
 // Loads config.yaml and returns a Config struct
@@ -53,4 +56,19 @@ func (c Config) listMachines() ([]string, error) {
 		return machines, err
 	}
 	return machines, nil
+}
+
+func (c Config) listHooks() ([]string, error) {
+	var hooks []string
+	files, err := ioutil.ReadDir(c.HookPath)
+	for _, file := range files {
+		name := file.Name()
+		if path.Ext(name) == ".sh" {
+			hooks = append(hooks, name)
+		}
+	}
+	if err != nil {
+		return hooks, err
+	}
+	return hooks, nil
 }
