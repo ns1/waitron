@@ -8,18 +8,17 @@ import (
 
 // Config is our global configuration file
 type Config struct {
-	TemplatePath        string
-	MachinePath         string
-	BaseURL             string
-	ForemanProxyAddress string `yaml:"foreman_proxy_address"`
-	DefaultCmdline      string `yaml:"default_cmdline"`
-	DefaultKernel       string `yaml:"default_kernel"`
-	DefaultInitrd       string `yaml:"default_initrd"`
-	DefaultImageURL     string `yaml:"default_image_url"`
-	Params              map[string]string
-	Tokens              map[string]string
-	MachineState        map[string]string
-	MachineBuild        map[string]string
+	TemplatePath    string
+	MachinePath     string
+	BaseURL         string
+	DefaultCmdline  string `yaml:"default_cmdline"`
+	DefaultKernel   string `yaml:"default_kernel"`
+	DefaultInitrd   string `yaml:"default_initrd"`
+	DefaultImageURL string `yaml:"default_image_url"`
+	Params          map[string]string
+	Tokens          map[string]string
+	MachineState    map[string]string
+	MachineBuild    map[string]string
 }
 
 // Loads config.yaml and returns a Config struct
