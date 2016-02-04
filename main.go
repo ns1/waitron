@@ -69,7 +69,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 		err = executeHooks(hookType, m, config)
 		if err != nil {
 			log.Println(err)
-			http.Error(response, fmt.Sprintf("Cannot execute pre hooks for: ", hostname), 500)
+			http.Error(response, fmt.Sprintf("Cannot execute pre hooks"), 500)
 			return
 		}
 
@@ -178,7 +178,7 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
 	err = executeHooks(hookType, m, config)
 	if err != nil {
 		log.Println(err)
-		http.Error(response, fmt.Sprintf("Cannot execute post hooks for: ", hostname), 500)
+		http.Error(response, fmt.Sprintf("Cannot execute post hooks"), 500)
 		return
 	}
 
