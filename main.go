@@ -21,6 +21,11 @@ type result struct {
 	State string `json:",omitempty"`
 }
 
+type HttpResponse struct {
+	Message    string
+	StatusCode int
+}
+
 // @Title templateHandler
 // @Description Renders either the finish or the preseed template
 // @Param hostname	path	string	true	"Hostname"
@@ -40,12 +45,12 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 	m, err := machineDefinition(hostname, config.MachinePath)
 	if err != nil {
 		log.Println(err)
-		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 400)
+		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), http.StatusNotFound)
 		return
 	}
 
 	if ps.ByName("token") != config.Tokens[hostname] {
-		http.Error(response, "Invalid Token", 401)
+		http.Error(response, "Invalid Token", http.StatusUnauthorized)
 		return
 	}
 
@@ -64,7 +69,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 		renderedTemplate, err := m.renderCloudInit(hostname, config)
 		if err != nil {
 			log.Println(err)
-			http.Error(response, "Unable to render template", 400)
+			http.Error(response, "Unable to render template", http.StatusInternalServerError)
 			return
 		}
 		fmt.Fprintf(response, renderedTemplate)
@@ -74,11 +79,35 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 	renderedTemplate, err := m.renderTemplate(template, config)
 	if err != nil {
 		log.Println(err)
-		http.Error(response, "Unable to render template", 400)
+		http.Error(response, "Unable to render template", http.StatusInternalServerError)
 		return
 	}
 
 	fmt.Fprintf(response, renderedTemplate)
+}
+
+// @Title hostConfigHandler
+// @Description Renders the host configuration
+// @Param hostname  path  string  true  "Hostname"
+// @Success 200 {object} string "Rendered template"
+// @Failure 400 {object} string "Unable to find host definition for hostname"
+// @Router /config/{hostname} [GET]
+func hostConfigHandler(response http.ResponseWriter, request *http.Request,
+	ps httprouter.Params,
+	config Config) {
+
+	hostname := ps.ByName("hostname")
+
+	m, err := machineDefinition(hostname, config.MachinePath)
+	if err != nil {
+		log.Println(err)
+		http.Error(response, "", http.StatusNotFound)
+		return
+	}
+
+	response.Header().Set("content-type", "application/json")
+	result, _ := json.Marshal(m)
+	response.Write(result)
 }
 
 // @Title buildHandler
@@ -95,18 +124,20 @@ func buildHandler(response http.ResponseWriter, request *http.Request,
 	m, err := machineDefinition(hostname, config.MachinePath)
 	if err != nil {
 		log.Println(err)
-		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 500)
+		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), http.StatusNotFound)
 		return
 	}
 
 	err = m.setBuildMode(config)
 	if err != nil {
 		log.Println(err)
-		http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), 500)
+		http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), http.StatusInternalServerError)
 		return
 	}
-
-	fmt.Fprintf(response, "OK")
+	response.Header().Set("content-type", "application/json")
+	msg := HttpResponse{"ok", http.StatusOK}
+	js, err := json.Marshal(msg)
+	response.Write(js)
 }
 
 // @Title doneHandler
@@ -139,8 +170,10 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
 		http.Error(response, "Failed to cancel build mode", 500)
 		return
 	}
-
-	fmt.Fprintf(response, "OK")
+	response.Header().Set("content-type", "application/json")
+	msg := HttpResponse{"ok", http.StatusOK}
+	js, err := json.Marshal(msg)
+	response.Write(js)
 }
 
 // @Title hostStatus
@@ -172,8 +205,9 @@ func listMachinesHandler(response http.ResponseWriter, request *http.Request,
 		http.Error(response, "Unable to list machines", 500)
 		return
 	}
-	result, _ := json.Marshal(machines)
-	response.Write(result)
+	js, _ := json.Marshal(machines)
+	response.Header().Set("content-type", "application/json")
+	response.Write(js)
 }
 
 // @Title status
@@ -182,8 +216,9 @@ func listMachinesHandler(response http.ResponseWriter, request *http.Request,
 // @Router /status [GET]
 func status(response http.ResponseWriter, request *http.Request,
 	ps httprouter.Params, config Config) {
-	result, _ := json.Marshal(&config.MachineState)
-	response.Write(result)
+	js, _ := json.Marshal(&config.MachineState)
+	response.Header().Set("content-type", "application/json")
+	response.Write(js)
 }
 
 // @Title pixieHandler
@@ -216,8 +251,9 @@ func pixieHandler(response http.ResponseWriter, request *http.Request,
 	}
 
 	pxeconfig, _ := m.pixieInit(config)
-	result, _ := json.Marshal(pxeconfig)
-	response.Write(result)
+	js, _ := json.Marshal(pxeconfig)
+	response.Header().Set("content-type", "application/json")
+	response.Write(js)
 
 }
 
@@ -244,6 +280,10 @@ func main() {
 	r.GET("/status/:hostname",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			hostStatus(response, request, ps, configuration)
+		})
+	r.GET("/config/:hostname",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			hostConfigHandler(response, request, ps, configuration)
 		})
 	r.GET("/status",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
