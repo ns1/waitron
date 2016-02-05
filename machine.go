@@ -30,7 +30,7 @@ type Machine struct {
 	Cmdline         string
 	Roles           []string
 	PubKeys         []string `yaml:"pub_keys"`
-	Ipmi            []Ipmi
+	Ipmi            Ipmi
 }
 
 // IPMI Configuration
