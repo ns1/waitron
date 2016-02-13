@@ -43,7 +43,7 @@ type VmInstance struct {
 	Os         string
 	Memory     int
 	Vpcu       int
-	image      string
+	Image      string
 	Interfaces []VmInterface
 	Roles      []string
 }
