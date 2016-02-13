@@ -1,0 +1,27 @@
+# virtual machines deployed to
+#
+# my-service.example.com
+#
+
+vm:
+ - hostname: my-service-vm
+   domain: example.com
+   os: precise
+   memory: 60000
+   vpcu: 6
+   image: base.qcow2
+   interfaces:
+     - name: eth0
+       ipaddress: 192.168.1.2
+       netmask: 255.255.255.0
+       gateway: 192.168.1.1
+       vlan: 0
+     - name: eth1
+       ipaddress: 192.168.2.1
+       netmask: 255.255.255.0
+       dnsname: TenGig-eth1
+       vlan: 0
+     - name: eth2
+   roles:
+    - common
+    - edge
