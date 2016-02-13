@@ -42,7 +42,7 @@ type VmInstance struct {
 	Domain     string
 	Os         string
 	Memory     int
-	Vpcu       int
+	Vcpu       int
 	Image      string
 	Interfaces []VmInterface
 	Roles      []string
