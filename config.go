@@ -10,6 +10,7 @@ import (
 type Config struct {
 	TemplatePath    string
 	MachinePath     string
+	VmPath          string
 	HookPath        string
 	BaseURL         string
 	DefaultCmdline  string `yaml:"default_cmdline"`

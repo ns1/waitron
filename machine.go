@@ -33,6 +33,30 @@ type Machine struct {
 	Ipmi            Ipmi
 }
 
+type Vm struct {
+	Vm []VmInstance
+}
+
+type VmInstance struct {
+	Hostname   string
+	Domain     string
+	Os         string
+	Memory     int
+	Vpcu       int
+	image      string
+	Interfaces []VmInterface
+	Roles      []string
+}
+
+type VmInterface struct {
+	Name      string
+	IPAddress string
+	Netmask   string
+	Gateway   string
+	Vlan      int
+	Dnsname   string
+}
+
 // IPMI Configuration
 type Ipmi struct {
 	IPAddress  string
@@ -70,6 +94,19 @@ func machineDefinition(hostname string, machinePath string) (Machine, error) {
 	m.ShortName = hostSlice[0]
 	m.Domain = strings.Join(hostSlice[1:], ".")
 	return m, nil
+}
+
+func vmDefinition(hostname string, vmPath string) (Vm, error) {
+	var v Vm
+	data, err := ioutil.ReadFile(path.Join(vmPath, hostname+".yaml"))
+	if err != nil {
+		return Vm{}, err
+	}
+	err = yaml.Unmarshal(data, &v)
+	if err != nil {
+		return Vm{}, err
+	}
+	return v, nil
 }
 
 // Render template among with machine and config struct

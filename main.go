@@ -113,6 +113,30 @@ func hostConfigHandler(response http.ResponseWriter, request *http.Request,
 	response.Write(result)
 }
 
+// @Title hostConfigVmHandler
+// @Description Renders the host configuration
+// @Param hostname  path  string  true  "Hostname"
+// @Success 200 {object} string "Config"
+// @Failure 400 {object} string "Unable to find vm definition for hostname"
+// @Router /config/{hostname}/vm [GET]
+func hostConfigVmHandler(response http.ResponseWriter, request *http.Request,
+	ps httprouter.Params,
+	config Config) {
+
+	hostname := ps.ByName("hostname")
+
+	m, err := vmDefinition(hostname, config.VmPath)
+	if err != nil {
+		log.Println(err)
+		http.Error(response, "", http.StatusNotFound)
+		return
+	}
+
+	response.Header().Set("content-type", "application/json")
+	result, _ := json.Marshal(m)
+	response.Write(result)
+}
+
 // @Title buildHandler
 // @Description Put the server in build mode
 // @Param hostname	path	string	true	"Hostname"
@@ -318,6 +342,10 @@ func main() {
 	r.GET("/config/:hostname",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			hostConfigHandler(response, request, ps, configuration)
+		})
+	r.GET("/config/:hostname/vm",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			hostConfigVmHandler(response, request, ps, configuration)
 		})
 	r.GET("/status",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {

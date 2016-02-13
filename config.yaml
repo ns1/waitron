@@ -1,5 +1,6 @@
 templatepath: templates
 machinepath: machines
+vmpath: machines/vm
 hookpath: hooks
 baseurl: http://127.0.0.1:9090
 params:
