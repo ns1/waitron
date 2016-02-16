@@ -38,14 +38,17 @@ type Vm struct {
 }
 
 type VmInstance struct {
-	Hostname   string
-	Domain     string
-	Os         string
-	Memory     int
-	Vcpu       int
-	Image      string
-	Interfaces []VmInterface
-	Roles      []string
+	Hostname    string
+	Domain      string
+	Os          string
+	Memory      int
+	Vcpu        int
+	Image       string
+	VirtNetwork string `yaml:"virt_network"`
+	Interfaces  []VmInterface
+	Roles       []string
+	AttachDisks []string `yaml:"attach_disks"`
+	CloudConfig string   `yaml:"cloud_config"`
 }
 
 type VmInterface struct {

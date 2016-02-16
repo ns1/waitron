@@ -25,3 +25,7 @@ vm:
    roles:
     - common
     - edge
+   attach_disks:
+    - sda
+   virt_network: ovsbr0
+   cloud_config: my-service
