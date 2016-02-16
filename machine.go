@@ -48,7 +48,7 @@ type VmInstance struct {
 	Interfaces  []VmInterface
 	Roles       []string
 	AttachDisks []string `yaml:"attach_disks"`
-	CloudConfig string   `yaml:"cloud_config"`
+	CloudInit   []string `yaml:"cloud_init"`
 }
 
 type VmInterface struct {

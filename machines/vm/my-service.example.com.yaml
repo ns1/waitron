@@ -28,4 +28,6 @@ vm:
    attach_disks:
     - sda
    virt_network: ovsbr0
-   cloud_config: my-service
+   cloud_init:
+    - base-init.sh:text/x-shellscript
+    - cloud-config:text/cloud-config
