@@ -16,6 +16,7 @@ import (
 // Machine configuration
 type Machine struct {
 	Hostname        string
+	PrimaryInterfaceName     string `yaml:"primary_interface_name"`
 	OperatingSystem string
 	Finish          string
 	Preseed         string
@@ -81,7 +82,13 @@ func (m Machine) renderTemplate(template string, config Config) (string, error) 
 // Posts machine macaddress to the forman proxy among with pxe configuration
 func (m Machine) setBuildMode(config Config) error {
 	// Generate a random token used to authenticate requests
-	config.Tokens[m.Hostname] = uuid.NewV4().String()
+	uuid, err := uuid.NewV4();
+	
+	if err != nil {
+		return err
+	}
+	
+	config.Tokens[m.Hostname] = uuid.String()
 	log.Println(fmt.Sprintf("%s installation token: %s", m.Hostname, config.Tokens[m.Hostname]))
 	// Add token to machine struct
 	m.Token = config.Tokens[m.Hostname]
@@ -119,10 +126,11 @@ func (m Machine) pixieInit(config Config) (PixieConfig, error) {
 	if err != nil {
 		return pixieConfig, err
 	}
-	cmdline, err := tpl.Execute(pongo2.Context{"BaseURL": config.BaseURL, "Hostname": m.Hostname, "Token": m.Token})
+	cmdline, err := tpl.Execute(pongo2.Context{"machine": m, "BaseURL": config.BaseURL, "Hostname": m.Hostname, "Token": m.Token})
 	if err != nil {
 		return pixieConfig, err
 	}
+
 	pixieConfig.Kernel = defaultString(m.ImageURL+m.Kernel, config.DefaultImageURL+config.DefaultKernel)
 	pixieConfig.Initrd = []string{defaultString(m.ImageURL+m.Initrd, config.DefaultImageURL+config.DefaultInitrd)}
 	pixieConfig.Cmdline = cmdline

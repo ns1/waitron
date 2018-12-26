@@ -13,6 +13,7 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/julienschmidt/httprouter"
+	"flag"
 )
 
 type result struct {
@@ -210,9 +211,18 @@ func pixieHandler(response http.ResponseWriter, request *http.Request,
 }
 
 func main() {
-	configFile := os.Getenv("CONFIG_FILE")
+	
+	config := flag.String("config", "", "Path to config file.")
+	address := flag.String("address", "", "Address to listen for requests.")
+	port := flag.String("port", "9090", "Port to listen for requests.")
+	flag.Parse()
+	
+	configFile := *config
+
 	if configFile == "" {
-		log.Fatal("environment variables CONFIG_FILE must be set")
+		if configFile = os.Getenv("CONFIG_FILE"); configFile == "" {
+			log.Fatal("environment variables CONFIG_FILE must be set")
+		}
 	}
 
 	configuration, err := loadConfig(configFile)
@@ -250,6 +260,7 @@ func main() {
 			pixieHandler(response, request, ps, configuration)
 		})
 
-	log.Println("Starting Server")
-	log.Fatal(http.ListenAndServe(":9090", handlers.LoggingHandler(os.Stdout, r)))
+
+	log.Println("Starting Server on " + *address + ":" + *port)
+	log.Fatal(http.ListenAndServe(*address + ":" + *port, handlers.LoggingHandler(os.Stdout, r)))
 }
