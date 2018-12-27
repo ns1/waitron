@@ -16,14 +16,13 @@ import (
 // Machine configuration
 type Machine struct {
 	Hostname        string
-	PrimaryInterfaceName     string `yaml:"primary_interface_name"`
 	OperatingSystem string
 	Finish          string
 	Preseed         string
 	ShortName       string
 	Domain          string
 	Token           string // This is set by the service
-	Network         []Interface
+	Network         []Interface `yaml:"network"`
 	Params          map[string]string
 	ImageURL        string `yaml:"image_url"`
 	Kernel          string
@@ -31,13 +30,20 @@ type Machine struct {
 	Cmdline         string
 }
 
+type IPConfig struct {
+	IPAddress  string `yaml:"ipaddress"`
+	Netmask    string `yaml:"netmask"`
+	Cidr       string `yaml:"cidr"`
+}
+
 // Interface Configuration
 type Interface struct {
-	Name       string
-	IPAddress  string
-	MacAddress string
-	Gateway    string
-	Netmask    string
+	Name       string `yaml:"name"`
+	Addresses4 []IPConfig `yaml:"addresses4"`
+	Addresses6 []IPConfig `yaml:"addresses6"`	
+	MacAddress string `yaml:"macaddress"`
+	Gateway4    string `yaml:"gateway4"`
+	Gateway6    string `yaml:"gateway6"`
 }
 
 // PixieConfig boot configuration
@@ -47,7 +53,21 @@ type PixieConfig struct {
 	Cmdline string   `json:"cmdline"`
 }
 
+func FilterGetValueByKey(in *pongo2.Value, param *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
+        m := in.Interface().(map[string]string)
+        if val, ok := m[param.String()]; ok {
+	        return pongo2.AsValue(val), nil
+        } else {
+        	return pongo2.AsValue(""), nil
+        }
+}
+
+
 func machineDefinition(hostname string, machinePath string) (Machine, error) {
+
+
+	pongo2.RegisterFilter("key", FilterGetValueByKey)
+	
 	var m Machine
 	data, err := ioutil.ReadFile(path.Join(machinePath, hostname+".yaml"))
 	if err != nil {
