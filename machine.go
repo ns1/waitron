@@ -66,13 +66,42 @@ func FilterGetValueByKey(in *pongo2.Value, param *pongo2.Value) (*pongo2.Value, 
 func machineDefinition(hostname string, machinePath string, config Config) (Machine, error) {
 
 
-	hostname = strings.ToLower(hostname)
-
 	pongo2.RegisterFilter("key", FilterGetValueByKey)
 
-	// First load a machine definition.
-	var m Machine
-	data, err := ioutil.ReadFile(path.Join(machinePath, hostname+".yaml")) // compute01.apc03.prod.yml
+	hostname = strings.ToLower(hostname)
+	hostSlice := strings.Split(hostname, ".")
+
+
+	m := Machine{
+		Hostname: hostname,
+		ShortName: hostSlice[0],
+		Domain: strings.Join(hostSlice[1:], "."),
+	}
+
+	// Merge in the "global" config.  The marshal/unmarshal combo looks funny, but it's clean and we aren't shooting for warp speed here.
+	if c, err := yaml.Marshal(config); err == nil {
+	    if err = yaml.Unmarshal(c, &m); err != nil {
+	    	return m, err
+	    }
+	} else {
+		return m, err
+	}	
+
+	// Then, load the domain definition.
+	data, err := ioutil.ReadFile(path.Join(machinePath, m.Domain+".yaml")) // apc03.prod.yaml
+	if err != nil {
+		if !os.IsNotExist(err) { // We should expect the file to not exist, but if it did exist, err happened for a different reason, then it should be reported. 
+			return m, err
+		}
+	} else {
+		if err = yaml.Unmarshal(data, &m); err != nil {
+			return m, err
+		}
+	}
+
+
+	// Then load the machine definition.
+	data, err = ioutil.ReadFile(path.Join(machinePath, hostname+".yaml")) // compute01.apc03.prod.yaml
 	if err != nil {
 		return Machine{}, err
 	}
@@ -81,31 +110,6 @@ func machineDefinition(hostname string, machinePath string, config Config) (Mach
 		return Machine{}, err
 	}
 
-	hostSlice := strings.Split(m.Hostname, ".")
-	m.ShortName = hostSlice[0]
-	m.Domain = strings.Join(hostSlice[1:], ".")
-	
-	// Then, load the domain definition.
-	data, err = ioutil.ReadFile(path.Join(machinePath, m.Domain+".yaml")) // apc03.prod.yml
-	if err != nil {
-		if !os.IsNotExist(err) { // We should expect the file to frequently not exist, but if it did exist, err happened for a different reason, then it should be reported. 
-			return m, err
-		}
-	} else {
-		if err = yaml.Unmarshal(data, &m); err != nil {
-			return m, err
-		}
-	}
-	
-	// Then, Merge in the "global" config.  The marshal/unmarshal combo looks funny, but it's clean and we aren't shooting for warp speed here.
-	if c, err := yaml.Marshal(config); err == nil {
-	    if err = yaml.Unmarshal(c, &m); err != nil {
-	    	return m, err
-	    }
-	} else {
-		return m, err
-	}	
-	
 	return m, nil
 }
 
@@ -180,9 +184,6 @@ func (m Machine) pixieInit(config Config) (PixieConfig, error) {
 	pixieConfig.Kernel = m.ImageURL+m.Kernel
 	pixieConfig.Initrd = []string{m.ImageURL+m.Initrd}
 	pixieConfig.Cmdline = cmdline
-	
-	log.Println(pixieConfig)
-	log.Println(m)
-	
+
 	return pixieConfig, nil
 }
