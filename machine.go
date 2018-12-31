@@ -24,6 +24,7 @@ type Machine struct {
 	Token           string // This is set by the service
 	Network         []Interface `yaml:"network"`
 	Params          map[string]string
+	BaseURL         string	
 	ImageURL        string `yaml:"image_url"`
 	Kernel          string
 	Initrd          string
@@ -176,7 +177,7 @@ func (m Machine) pixieInit(config Config) (PixieConfig, error) {
 	if err != nil {
 		return pixieConfig, err
 	}
-	cmdline, err := tpl.Execute(pongo2.Context{"machine": m, "BaseURL": config.BaseURL, "Hostname": m.Hostname, "Token": m.Token})
+	cmdline, err := tpl.Execute(pongo2.Context{"machine": m, "BaseURL": m.BaseURL, "Hostname": m.Hostname, "Token": m.Token})
 	if err != nil {
 		return pixieConfig, err
 	}
