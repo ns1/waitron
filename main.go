@@ -34,23 +34,23 @@ type result struct {
 // @Router /template/{template}/{hostname}/{token} [GET]
 func templateHandler(response http.ResponseWriter, request *http.Request,
 	ps httprouter.Params,
-	config Config) {
+	config Config, state State) {
 	hostname := ps.ByName("hostname")
 
-	m, err := machineDefinition(hostname, config.MachinePath)
+	m, err := machineDefinition(hostname, config.MachinePath, config)
 	if err != nil {
 		log.Println(err)
 		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 400)
 		return
 	}
 
-	if ps.ByName("token") != config.Tokens[hostname] {
+	if ps.ByName("token") != state.Tokens[hostname] {
 		http.Error(response, "Invalid Token", 401)
 		return
 	}
 
 	// Set token used in template
-	m.Token = config.Tokens[hostname]
+	m.Token = state.Tokens[hostname]
 
 	// Render preseed as default
 	var template string
@@ -78,17 +78,17 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 // @Failure 500	{object} string "Failed to set build mode on hostname"
 // @Router build/{hostname} [PUT]
 func buildHandler(response http.ResponseWriter, request *http.Request,
-	ps httprouter.Params, config Config) {
+	ps httprouter.Params, config Config, state State) {
 	hostname := ps.ByName("hostname")
 
-	m, err := machineDefinition(hostname, config.MachinePath)
+	m, err := machineDefinition(hostname, config.MachinePath, config)
 	if err != nil {
 		log.Println(err)
 		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 500)
 		return
 	}
 
-	err = m.setBuildMode(config)
+	err = m.setBuildMode(config, state)
 	if err != nil {
 		log.Println(err)
 		http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), 500)
@@ -108,21 +108,21 @@ func buildHandler(response http.ResponseWriter, request *http.Request,
 // @Failure 401	{object} string "Invalid token"
 // @Router /done/{hostname}/{token} [GET]
 func doneHandler(response http.ResponseWriter, request *http.Request,
-	ps httprouter.Params, config Config) {
+	ps httprouter.Params, config Config, state State) {
 	hostname := ps.ByName("hostname")
-	m, err := machineDefinition(hostname, config.MachinePath)
+	m, err := machineDefinition(hostname, config.MachinePath, config)
 	if err != nil {
 		log.Println(err)
 		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 500)
 		return
 	}
 
-	if ps.ByName("token") != config.Tokens[hostname] {
+	if ps.ByName("token") != state.Tokens[hostname] {
 		http.Error(response, "Invalid Token", 401)
 		return
 	}
 
-	err = m.cancelBuildMode(config)
+	err = m.cancelBuildMode(config, state)
 	if err != nil {
 		log.Println(err)
 		http.Error(response, "Failed to cancel build mode", 500)
@@ -139,8 +139,8 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
 // @Failure 500	{object} string "Unknown state"
 // @Router /status/{hostname} [GET]
 func hostStatus(response http.ResponseWriter, request *http.Request,
-	ps httprouter.Params, config Config) {
-	status := config.MachineState[ps.ByName("hostname")]
+	ps httprouter.Params, config Config, state State) {
+	status := state.MachineState[ps.ByName("hostname")]
 	if status == "" {
 		http.Error(response, "Unknown state", 500)
 		return
@@ -154,7 +154,7 @@ func hostStatus(response http.ResponseWriter, request *http.Request,
 // @Failure 500	{object} string "Unable to list machines"
 // @Router /list [GET]
 func listMachinesHandler(response http.ResponseWriter, request *http.Request,
-	_ httprouter.Params, config Config) {
+	_ httprouter.Params, config Config, state State) {
 	machines, err := config.listMachines()
 	if err != nil {
 		log.Println(err)
@@ -170,8 +170,8 @@ func listMachinesHandler(response http.ResponseWriter, request *http.Request,
 // @Success 200	{object} string "Dictionary with machines and its status"
 // @Router /status [GET]
 func status(response http.ResponseWriter, request *http.Request,
-	ps httprouter.Params, config Config) {
-	result, _ := json.Marshal(&config.MachineState)
+	ps httprouter.Params, config Config, state State) {
+	result, _ := json.Marshal(&state.MachineState)
 	response.Write(result)
 }
 
@@ -183,10 +183,10 @@ func status(response http.ResponseWriter, request *http.Request,
 // @Failure 500	{object} string "Unable to find host definition for hostname"
 // @Router /v1/boot/{macaddr} [GET]
 func pixieHandler(response http.ResponseWriter, request *http.Request,
-	ps httprouter.Params, config Config) {
+	ps httprouter.Params, config Config, state State) {
 
 	macaddr := ps.ByName("macaddr")
-	hostname, found := config.MachineBuild[macaddr]
+	hostname, found := state.MachineBuild[macaddr]
 
 	if found == false {
 		log.Println(found)
@@ -194,9 +194,9 @@ func pixieHandler(response http.ResponseWriter, request *http.Request,
 		return
 	}
 
-	m, err := machineDefinition(hostname, config.MachinePath)
+	m, err := machineDefinition(hostname, config.MachinePath, config)
 
-	m.Token = config.Tokens[hostname]
+	m.Token = state.Tokens[hostname]
 
 	if err != nil {
 		log.Println(err)
@@ -229,35 +229,37 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	
+	state := loadState()
 
 	r := httprouter.New()
 	r.GET("/list",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			listMachinesHandler(response, request, ps, configuration)
+			listMachinesHandler(response, request, ps, configuration, state)
 		})
 	r.PUT("/build/:hostname",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			buildHandler(response, request, ps, configuration)
+			buildHandler(response, request, ps, configuration, state)
 		})
 	r.GET("/status/:hostname",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			hostStatus(response, request, ps, configuration)
+			hostStatus(response, request, ps, configuration, state)
 		})
 	r.GET("/status",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			status(response, request, ps, configuration)
+			status(response, request, ps, configuration, state)
 		})
 	r.GET("/done/:hostname/:token",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			doneHandler(response, request, ps, configuration)
+			doneHandler(response, request, ps, configuration, state)
 		})
 	r.GET("/template/:template/:hostname/:token",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			templateHandler(response, request, ps, configuration)
+			templateHandler(response, request, ps, configuration, state)
 		})
 	r.GET("/v1/boot/:macaddr",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			pixieHandler(response, request, ps, configuration)
+			pixieHandler(response, request, ps, configuration, state)
 		})
 
 

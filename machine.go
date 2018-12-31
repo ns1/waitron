@@ -40,7 +40,7 @@ type IPConfig struct {
 type Interface struct {
 	Name       string `yaml:"name"`
 	Addresses4 []IPConfig `yaml:"addresses4"`
-	Addresses6 []IPConfig `yaml:"addresses6"`	
+	Addresses6 []IPConfig `yaml:"addresses6"`
 	MacAddress string `yaml:"macaddress"`
 	Gateway4    string `yaml:"gateway4"`
 	Gateway6    string `yaml:"gateway6"`
@@ -63,13 +63,16 @@ func FilterGetValueByKey(in *pongo2.Value, param *pongo2.Value) (*pongo2.Value, 
 }
 
 
-func machineDefinition(hostname string, machinePath string) (Machine, error) {
+func machineDefinition(hostname string, machinePath string, config Config) (Machine, error) {
 
+
+	hostname = strings.ToLower(hostname)
 
 	pongo2.RegisterFilter("key", FilterGetValueByKey)
-	
+
+	// First load a machine definition.
 	var m Machine
-	data, err := ioutil.ReadFile(path.Join(machinePath, hostname+".yaml"))
+	data, err := ioutil.ReadFile(path.Join(machinePath, hostname+".yaml")) // compute01.apc03.prod.yml
 	if err != nil {
 		return Machine{}, err
 	}
@@ -77,9 +80,32 @@ func machineDefinition(hostname string, machinePath string) (Machine, error) {
 	if err != nil {
 		return Machine{}, err
 	}
+
 	hostSlice := strings.Split(m.Hostname, ".")
 	m.ShortName = hostSlice[0]
 	m.Domain = strings.Join(hostSlice[1:], ".")
+	
+	// Then, load the domain definition.
+	data, err = ioutil.ReadFile(path.Join(machinePath, m.Domain+".yaml")) // apc03.prod.yml
+	if err != nil {
+		if !os.IsNotExist(err) { // We should expect the file to frequently not exist, but if it did exist, err happened for a different reason, then it should be reported. 
+			return m, err
+		}
+	} else {
+		if err = yaml.Unmarshal(data, &m); err != nil {
+			return m, err
+		}
+	}
+	
+	// Then, Merge in the "global" config.  The marshal/unmarshal combo looks funny, but it's clean and we aren't shooting for warp speed here.
+	if c, err := yaml.Marshal(config); err == nil {
+	    if err = yaml.Unmarshal(c, &m); err != nil {
+	    	return m, err
+	    }
+	} else {
+		return m, err
+	}	
+	
 	return m, nil
 }
 
@@ -100,7 +126,7 @@ func (m Machine) renderTemplate(template string, config Config) (string, error) 
 }
 
 // Posts machine macaddress to the forman proxy among with pxe configuration
-func (m Machine) setBuildMode(config Config) error {
+func (m Machine) setBuildMode(config Config, state State) error {
 	// Generate a random token used to authenticate requests
 	uuid, err := uuid.NewV4();
 	
@@ -108,14 +134,14 @@ func (m Machine) setBuildMode(config Config) error {
 		return err
 	}
 	
-	config.Tokens[m.Hostname] = uuid.String()
-	log.Println(fmt.Sprintf("%s installation token: %s", m.Hostname, config.Tokens[m.Hostname]))
+	state.Tokens[m.Hostname] = uuid.String()
+	log.Println(fmt.Sprintf("%s installation token: %s", m.Hostname, state.Tokens[m.Hostname]))
 	// Add token to machine struct
-	m.Token = config.Tokens[m.Hostname]
+	m.Token = state.Tokens[m.Hostname]
 	//Add to the MachineBuild table
-	config.MachineBuild[fmt.Sprintf("%s", m.Network[0].MacAddress)] = m.Hostname
+	state.MachineBuild[fmt.Sprintf("%s", m.Network[0].MacAddress)] = m.Hostname
 	//Change machine state
-	config.MachineState[m.Hostname] = "Installing"
+	state.MachineState[m.Hostname] = "Installing"
 	return nil
 }
 
@@ -123,11 +149,11 @@ func (m Machine) setBuildMode(config Config) error {
 cancelBuild remove the machines mac address from the MachineBuild map
 which stops waitron from serving the PixieConfig used by pixiecore
 */
-func (m Machine) cancelBuildMode(config Config) error {
+func (m Machine) cancelBuildMode(config Config, state State) error {
 	//Delete mac from the building map
-	delete(config.MachineBuild, fmt.Sprintf("%s", m.Network[0].MacAddress))
+	delete(state.MachineBuild, fmt.Sprintf("%s", m.Network[0].MacAddress))
 	//Change machine state
-	config.MachineState[m.Hostname] = "Installed"
+	state.MachineState[m.Hostname] = "Installed"
 	return nil
 }
 
@@ -142,7 +168,7 @@ func defaultString(string1 string, string2 string) string {
 // Builds pxe config to be sent to pixiecore
 func (m Machine) pixieInit(config Config) (PixieConfig, error) {
 	pixieConfig := PixieConfig{}
-	tpl, err := pongo2.FromString(defaultString(m.Cmdline, config.DefaultCmdline))
+	tpl, err := pongo2.FromString(m.Cmdline)
 	if err != nil {
 		return pixieConfig, err
 	}
@@ -151,8 +177,12 @@ func (m Machine) pixieInit(config Config) (PixieConfig, error) {
 		return pixieConfig, err
 	}
 
-	pixieConfig.Kernel = defaultString(m.ImageURL+m.Kernel, config.DefaultImageURL+config.DefaultKernel)
-	pixieConfig.Initrd = []string{defaultString(m.ImageURL+m.Initrd, config.DefaultImageURL+config.DefaultInitrd)}
+	pixieConfig.Kernel = m.ImageURL+m.Kernel
+	pixieConfig.Initrd = []string{m.ImageURL+m.Initrd}
 	pixieConfig.Cmdline = cmdline
+	
+	log.Println(pixieConfig)
+	log.Println(m)
+	
 	return pixieConfig, nil
 }
