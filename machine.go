@@ -188,7 +188,7 @@ func (m Machine) cancelBuildMode(config Config, state State) error {
 	//Change machine state
 	state.MachineState[m.Hostname] = "Installed"
 
-	// Perform any desired operations needed prior to setting build mode.
+	// Perform any desired operations needed after a machine has been taken out of build mode.
 	for _, buildCommand := range m.PostBuildCommands {
 
 		if buildCommand.TimeoutSeconds == 0 {
