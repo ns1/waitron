@@ -13,8 +13,16 @@ type State struct {
 	MachineBuild        map[string]string
 }
 
+type BuildCommand struct {
+	Command			string
+	TimeoutSeconds	int `yaml:"timeout_seconds"`
+	ErrorsFatal		bool `yaml:"errors_fatal"`
+	ShouldLog		bool `yaml:"should_log"`
+}
+
 type Config struct {
 	TemplatePath        string
+	GroupPath			string
 	MachinePath         string
 	BaseURL             string
 	ForemanProxyAddress string `yaml:"foreman_proxy_address"`
@@ -23,6 +31,8 @@ type Config struct {
 	Initrd       string `yaml:"initrd"`
 	ImageURL     string `yaml:"image_url"`
 	Params              map[string]string
+	PreBuildCommands	[]BuildCommand `yaml:"prebuild_commands"`
+	PostBuildCommands	[]BuildCommand `yaml:"postbuild_commands"`
 }
 
 // Loads config.yaml and returns a Config struct

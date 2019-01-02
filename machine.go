@@ -9,12 +9,16 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
+	"time"	
+	"syscall"
 )
 
 // Machine configuration
 type Machine struct {
+	Config `yaml:",inline"`
 	Hostname        string
 	OperatingSystem string
 	Finish          string
@@ -23,12 +27,6 @@ type Machine struct {
 	Domain          string
 	Token           string // This is set by the service
 	Network         []Interface `yaml:"network"`
-	Params          map[string]string
-	BaseURL         string	
-	ImageURL        string `yaml:"image_url"`
-	Kernel          string
-	Initrd          string
-	Cmdline         string
 }
 
 type IPConfig struct {
@@ -89,7 +87,7 @@ func machineDefinition(hostname string, machinePath string, config Config) (Mach
 	}	
 
 	// Then, load the domain definition.
-	data, err := ioutil.ReadFile(path.Join(machinePath, m.Domain+".yaml")) // apc03.prod.yaml
+	data, err := ioutil.ReadFile(path.Join(config.GroupPath, m.Domain+".yaml")) // apc03.prod.yaml
 	if err != nil {
 		if !os.IsNotExist(err) { // We should expect the file to not exist, but if it did exist, err happened for a different reason, then it should be reported. 
 			return m, err
@@ -139,6 +137,36 @@ func (m Machine) setBuildMode(config Config, state State) error {
 		return err
 	}
 	
+	// Perform any desired operations needed prior to setting build mode.
+	for _, buildCommand := range m.PreBuildCommands {
+
+		if buildCommand.TimeoutSeconds == 0 {
+			buildCommand.TimeoutSeconds = 5
+		}
+	
+		tpl, err := pongo2.FromString(buildCommand.Command)
+		if err != nil {
+			return err
+		}
+		
+		cmdline, err := tpl.Execute(pongo2.Context{"machine": m, "Token": uuid.String()})
+
+		if buildCommand.ShouldLog {
+			log.Println(cmdline)
+		}
+	
+		if err != nil {
+			return err
+		}
+		
+		// Now actually execute the command and return err if ErrorsFatal
+		out, err := m.TimedCommandOutput(time.Duration(buildCommand.TimeoutSeconds) * time.Second, cmdline)
+
+		if err != nil && buildCommand.ErrorsFatal {
+			return errors.New(err.Error() + ":" + string(out))
+		}
+	}		
+	
 	state.Tokens[m.Hostname] = uuid.String()
 	log.Println(fmt.Sprintf("%s installation token: %s", m.Hostname, state.Tokens[m.Hostname]))
 	// Add token to machine struct
@@ -159,6 +187,37 @@ func (m Machine) cancelBuildMode(config Config, state State) error {
 	delete(state.MachineBuild, fmt.Sprintf("%s", m.Network[0].MacAddress))
 	//Change machine state
 	state.MachineState[m.Hostname] = "Installed"
+
+	// Perform any desired operations needed prior to setting build mode.
+	for _, buildCommand := range m.PostBuildCommands {
+
+		if buildCommand.TimeoutSeconds == 0 {
+			buildCommand.TimeoutSeconds = 5
+		}
+	
+		tpl, err := pongo2.FromString(buildCommand.Command)
+		if err != nil {
+			return err
+		}
+		
+		cmdline, err := tpl.Execute(pongo2.Context{"machine": m, "Token": m.Token})
+
+		if buildCommand.ShouldLog {
+			log.Println(cmdline)
+		}
+	
+		if err != nil {
+			return err
+		}
+		
+		// Now actually execute the command and return err if ErrorsFatal
+		out, err := m.TimedCommandOutput(time.Duration(buildCommand.TimeoutSeconds) * time.Second, cmdline)
+
+		if err != nil && buildCommand.ErrorsFatal {
+			return errors.New(err.Error() + ":" + string(out))
+		}
+	}		
+	
 	return nil
 }
 
@@ -187,4 +246,17 @@ func (m Machine) pixieInit(config Config) (PixieConfig, error) {
 	pixieConfig.Cmdline = cmdline
 
 	return pixieConfig, nil
+}
+
+func (m Machine) TimedCommandOutput(timeout time.Duration, command string) (out []byte, err error) {
+    cmd := exec.Command("bash", "-c", command)
+    cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+    time.AfterFunc(timeout, func() {
+        syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+    })
+
+    out, err = cmd.Output()
+   
+    return out, err
 }
