@@ -221,14 +221,6 @@ func (m Machine) cancelBuildMode(config Config, state State) error {
 	return nil
 }
 
-// Return string2 if string1 is empty
-func defaultString(string1 string, string2 string) string {
-	if string1 == "" {
-		return string2
-	}
-	return string1
-}
-
 // Builds pxe config to be sent to pixiecore
 func (m Machine) pixieInit(config Config) (PixieConfig, error) {
 	pixieConfig := PixieConfig{}
@@ -248,6 +240,7 @@ func (m Machine) pixieInit(config Config) (PixieConfig, error) {
 	return pixieConfig, nil
 }
 
+// This should ensure that even commands that spawn child processes are cleaned up correctly, along with their children.
 func (m Machine) TimedCommandOutput(timeout time.Duration, command string) (out []byte, err error) {
     cmd := exec.Command("bash", "-c", command)
     cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
