@@ -32,9 +32,8 @@ type result struct {
 // @Failure 400	{object} string "Unable to render template"
 // @Failure 401	{object} string "Invalid token"
 // @Router /template/{template}/{hostname}/{token} [GET]
-func templateHandler(response http.ResponseWriter, request *http.Request,
-	ps httprouter.Params,
-	config Config, state State) {
+func templateHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, config Config, state State) {
+		
 	hostname := ps.ByName("hostname")
 
 	m, err := machineDefinition(hostname, config.MachinePath, config)
@@ -44,6 +43,8 @@ func templateHandler(response http.ResponseWriter, request *http.Request,
 		return
 	}
 
+	log.Println(m)
+	
 	if ps.ByName("token") != state.Tokens[hostname] {
 		http.Error(response, "Invalid Token", 401)
 		return

@@ -30,6 +30,9 @@ type Config struct {
 	Kernel       string `yaml:"kernel"`
 	Initrd       string `yaml:"initrd"`
 	ImageURL     string `yaml:"image_url"`
+	OperatingSystem string
+	Finish          string
+	Preseed         string
 	Params              map[string]string
 	PreBuildCommands	[]BuildCommand `yaml:"prebuild_commands"`
 	PostBuildCommands	[]BuildCommand `yaml:"postbuild_commands"`

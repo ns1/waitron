@@ -20,9 +20,6 @@ import (
 type Machine struct {
 	Config `yaml:",inline"`
 	Hostname        string
-	OperatingSystem string
-	Finish          string
-	Preseed         string
 	ShortName       string
 	Domain          string
 	Token           string // This is set by the service
@@ -88,22 +85,38 @@ func machineDefinition(hostname string, machinePath string, config Config) (Mach
 
 	// Then, load the domain definition.
 	data, err := ioutil.ReadFile(path.Join(config.GroupPath, m.Domain+".yaml")) // apc03.prod.yaml
+
 	if err != nil {
-		if !os.IsNotExist(err) { // We should expect the file to not exist, but if it did exist, err happened for a different reason, then it should be reported. 
+		if os.IsNotExist(err){
+			data, err = ioutil.ReadFile(path.Join(config.GroupPath, m.Domain+".yml")) // Try .yml
+			if err != nil && !os.IsNotExist(err) { // We should expect the file to not exist, but if it did exist, err happened for a different reason, then it should be reported.
+				return m, err
+			}
+		} else {
 			return m, err
 		}
-	} else {
-		if err = yaml.Unmarshal(data, &m); err != nil {
-			return m, err
-		}
+	}
+
+			
+	if err = yaml.Unmarshal(data, &m); err != nil {
+		return m, err
 	}
 
 
 	// Then load the machine definition.
 	data, err = ioutil.ReadFile(path.Join(machinePath, hostname+".yaml")) // compute01.apc03.prod.yaml
+
 	if err != nil {
-		return Machine{}, err
+		if os.IsNotExist(err) {
+			data, err = ioutil.ReadFile(path.Join(machinePath, hostname+".yml")) // One more try but look for .yml
+			if err != nil { // Whether the error was due to non-existence or something else, report it.  Machine definitions are must.
+				return Machine{}, err
+			}
+		} else {
+			return Machine{}, err
+		}
 	}
+	
 	err = yaml.Unmarshal(data, &m)
 	if err != nil {
 		return Machine{}, err
@@ -114,6 +127,10 @@ func machineDefinition(hostname string, machinePath string, config Config) (Mach
 
 // Render template among with machine and config struct
 func (m Machine) renderTemplate(template string, config Config) (string, error) {
+	
+	log.Println(template)
+	log.Println(config)
+	log.Println(m)
 
 	template = path.Join(config.TemplatePath, template)
 	if _, err := os.Stat(template); err != nil {
