@@ -127,10 +127,6 @@ func machineDefinition(hostname string, machinePath string, config Config) (Mach
 
 // Render template among with machine and config struct
 func (m Machine) renderTemplate(template string, config Config) (string, error) {
-	
-	log.Println(template)
-	log.Println(config)
-	log.Println(m)
 
 	template = path.Join(config.TemplatePath, template)
 	if _, err := os.Stat(template); err != nil {

@@ -43,8 +43,6 @@ func templateHandler(response http.ResponseWriter, request *http.Request, ps htt
 		return
 	}
 
-	log.Println(m)
-	
 	if ps.ByName("token") != state.Tokens[hostname] {
 		http.Error(response, "Invalid Token", 401)
 		return
