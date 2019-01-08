@@ -91,7 +91,7 @@ func machineDefinition(hostname string, machinePath string, config Config) (Mach
 			data, err = ioutil.ReadFile(path.Join(config.GroupPath, m.Domain+".yml")) // Try .yml
 			if err != nil && !os.IsNotExist(err) { // We should expect the file to not exist, but if it did exist, err happened for a different reason, then it should be reported.
 				return m, err
-			} else {
+			} else if os.IsNotExist(err) {
 				log.Println("No group file found for " + m.Domain + ". Is that intentional?")
 			}
 		} else {
