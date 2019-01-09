@@ -1,12 +1,32 @@
 templatepath: templates
 machinepath: machines
-baseurl: http://127.0.0.1:9090
+grouppath: groups
+baseurl: http://waitron01.example.com:9090
+operatingsystem: "18.04"
+cmdline: "netcfg/get_nameservers=8.8.8.8 netcfg/disable_dhcp=true interface={{ machine.Network.0.Name }} ksdevice={{ machine.Network.0.Name }} netcfg/get_ipaddress={{ machine.Network.0.Addresses4.0.IPAddress }} netcfg/get_gateway={{ machine.Network.0.Gateway4 }} netcfg/get_netmask={{ machine.Network.0.Addresses4.0.Netmask }} url={{ BaseURL }}/template/preseed/{{ Hostname }}/{{ Token }} ramdisk_size=10800 root=/dev/rd/0 rw auto hostname={{ Hostname }} console-setup/ask_detect=false console-setup/layout=USA console-setup/variant=USA keyboard-configuration/layoutcode=us localechooser/translation/warn-light=true localechooser/translation/warn-severe=true locale=en_US"
+kernel: linux
+image_url: http://archive.ubuntu.com/ubuntu/dists/bionic-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/
+initrd: initrd.gz
+preseed: preseed.j2
+finish: finish.j2
+
 params:
-    apt_hostname: "us.archive.ubuntu.com"
+    apt_hostname: "archive.ubuntu.com"
     apt_path: "/ubuntu/"
-    dns_nameservers: "8.8.8.8"
-    ntp_server: "us.pool.ntp.org"
-default_cmdline: "netcfg/get_nameservers=8.8.8.8 netcfg/disable_dhcp=true interface={{ machine.Network.0.Name }} ksdevice={{ machine.Network.0.Name }} netcfg/get_ipaddress={{ machine.Network.0.IPAddress }} netcfg/get_gateway={{ machine.Network.0.Gateway }} netcfg/get_netmask={{ machine.Network.0.Netmask }} url={{ BaseURL }}/template/preseed/{{ Hostname }}/{{ Token }} ramdisk_size=10800 root=/dev/rd/0 rw auto hostname={{ Hostname }} console-setup/ask_detect=false console-setup/layout=USA console-setup/variant=USA keyboard-configuration/layoutcode=us localechooser/translation/warn-light=true localechooser/translation/warn-severe=true locale=en_US"
-default_kernel: linux
-default_image_url: http://archive.ubuntu.com/ubuntu/dists/bionic-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/
-default_initrd: initrd.gz
+    nameservers: "8.8.8.8"    
+    ntp_server: "pool.ntp.org"
+    include_packages: "python2.7 ipmitool lsb-release openssh-server vim ifenslave vlan lldpd secure-delete curl wget strace docker.io"
+    os_version_name: "bionic"
+    ipmi_endpoint: http://ipmi01.example.com/api/command
+    
+
+prebuild_commands:
+  - command: 'wget -4 -O - -q "{{machine.Params.ipmi_endpoint}}?host={{machine.Params.ipmi_address}}&command=chassis%20bootdev%20pxe"'
+    errors_fatal: true
+    should_log: true
+    timeout_seconds: 3
+  - command: 'wget -4 -O - -q "{{machine.Params.ipmi_endpoint}}?host={{machine.Params.ipmi_address}}&command=chassis%20power%20cycle"'
+    errors_fatal: true
+    timeout_seconds: 3
+    should_log: true
+    

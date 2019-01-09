@@ -1,3 +1,35 @@
-Hello {{machine.Hostname}}
-Please install {{machine.OperatingSystem}}
-{% include "motd.j2" %}
+#!/bin/sh
+
+
+rm -rf /etc/netplan/*
+
+cat <<ENDNETPLAN > /etc/netplan/netplan-cfg.yaml
+network:
+    ethernets:
+{% for interface in machine.Network %}
+        {{interface.Name}}:
+            addresses:
+{% for ipconfig in interface.Addresses4 %}            
+                - {{ ipconfig.IPAddress}}/{{ipconfig.Cidr}}
+{% endfor %}
+{% for ipconfig in interface.Addresses6 %}            
+                - {{ ipconfig.IPAddress}}/{{ipconfig.Cidr}}
+{% endfor %}
+            dhcp4: false
+            dhcp6: false
+            accept-ra: false
+            gateway4: {{interface.Gateway4}}
+            gateway6: {{interface.Gateway6}}
+            nameservers:
+                addresses:
+                - 8.8.8.8
+                - 8.8.4.4
+                - 2001:4860:4860::8888
+                search:
+                - example.com
+    renderer: networkd
+    version: 2
+{% endfor %}
+ENDNETPLAN
+
+wget -O /dev/null -q '{{config.BaseURL}}/done/{{machine.Hostname}}/{{machine.Token}}'; 
