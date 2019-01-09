@@ -14,6 +14,9 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/julienschmidt/httprouter"
 	"flag"
+	
+	"time"
+	"sync"
 )
 
 type result struct {
@@ -28,7 +31,7 @@ type result struct {
 // @Param template	path	string	true	"The template to be rendered"
 // @Param token		path	string	true	"Token"
 // @Success 200	{object} string "Rendered template"
-// @Failure 400	{object} string "Unable to find host definition for hostname"
+// @Failure 400	{object} string "Not in build mode or definition does not exist"
 // @Failure 400	{object} string "Unable to render template"
 // @Failure 401	{object} string "Invalid token"
 // @Router /template/{template}/{hostname}/{token} [GET]
@@ -36,20 +39,22 @@ func templateHandler(response http.ResponseWriter, request *http.Request, ps htt
 		
 	hostname := ps.ByName("hostname")
 
-	m, err := machineDefinition(hostname, config.MachinePath, config)
-	if err != nil {
-		log.Println(err)
-		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 400)
-		return
-	}
-
 	if ps.ByName("token") != state.Tokens[hostname] {
 		http.Error(response, "Invalid Token", 401)
+		log.Println(ps.ByName("token"))
 		return
 	}
 
-	// Set token used in template
-	m.Token = state.Tokens[hostname]
+	// Get machine
+	state.Mux.Lock()
+	m, found := state.MachineBuild[state.BuildIdMac[state.Tokens[hostname]]]
+	state.Mux.Unlock()
+
+	if !found {
+		http.Error(response, "Not in build mode or definition does not exist", 400)
+		log.Println(m)
+		return
+	}
 
 	// Render preseed as default
 	var template string
@@ -102,26 +107,30 @@ func buildHandler(response http.ResponseWriter, request *http.Request,
 // @Param hostname	path	string	true	"Hostname"
 // @Param token		path	string	true	"Token"
 // @Success 200	{object} string "OK"
-// @Failure 500	{object} string "Unable to find host definition for hostname"
 // @Failure 500	{object} string "Failed to cancel build mode"
+// @Failure 400	{object} string "Not in build mode or definition does not exist"
 // @Failure 401	{object} string "Invalid token"
 // @Router /done/{hostname}/{token} [GET]
 func doneHandler(response http.ResponseWriter, request *http.Request,
 	ps httprouter.Params, config Config, state State) {
 	hostname := ps.ByName("hostname")
-	m, err := machineDefinition(hostname, config.MachinePath, config)
-	if err != nil {
-		log.Println(err)
-		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 500)
-		return
-	}
 
 	if ps.ByName("token") != state.Tokens[hostname] {
 		http.Error(response, "Invalid Token", 401)
 		return
 	}
 
-	err = m.cancelBuildMode(config, state)
+	// Get machine
+	state.Mux.Lock()
+	m, found := state.MachineBuild[state.BuildIdMac[state.Tokens[hostname]]]
+	state.Mux.Unlock()
+
+	if !found {
+		http.Error(response, "Not in build mode or definition does not exist", 400)
+		return
+	}
+
+	err := m.cancelBuildMode(config, state)
 	if err != nil {
 		log.Println(err)
 		http.Error(response, "Failed to cancel build mode", 500)
@@ -185,28 +194,44 @@ func pixieHandler(response http.ResponseWriter, request *http.Request,
 	ps httprouter.Params, config Config, state State) {
 
 	macaddr := ps.ByName("macaddr")
-	hostname, found := state.MachineBuild[macaddr]
+
+	state.Mux.Lock()
+	m, found := state.MachineBuild[macaddr]
+	state.Mux.Unlock()
 
 	if found == false {
 		log.Println(found)
-		http.Error(response, "Not in build mode", 404)
+		http.Error(response, "Not in build mode or definition does not exist", 404)
 		return
 	}
-
-	m, err := machineDefinition(hostname, config.MachinePath, config)
-
-	m.Token = state.Tokens[hostname]
-
-	if err != nil {
-		log.Println(err)
-		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 500)
-		return
-	}
-
-	pxeconfig, _ := m.pixieInit(config)
+	
+	pxeconfig, _ := m.pixieInit()
 	result, _ := json.Marshal(pxeconfig)
 	response.Write(result)
+}
 
+func checkForStaleBuilds (state State) {
+	
+	staleBuilds := make([]*Machine, 0)
+	
+	state.Mux.Lock()
+	
+	for macaddr, buildStartTime := range state.MachineBuildTime {
+		m :=  state.MachineBuild[macaddr]
+		if int(time.Now().Sub(buildStartTime).Seconds()) >= m.StaleBuildThresholdSeconds {
+			staleBuilds = append(staleBuilds, m)
+		}
+	}
+	
+	state.Mux.Unlock()
+	
+	for _, m := range staleBuilds {
+		go func(){
+			if err := m.RunBuildCommands(m.StaleBuildCommands); err != nil {
+				log.Print(err)
+			}
+		}()
+	}
 }
 
 func main() {
@@ -220,7 +245,7 @@ func main() {
 
 	if configFile == "" {
 		if configFile = os.Getenv("CONFIG_FILE"); configFile == "" {
-			log.Fatal("environment variables CONFIG_FILE must be set")
+			log.Fatal("environment variables CONFIG_FILE must be set or use --config")
 		}
 	}
 
@@ -260,8 +285,24 @@ func main() {
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			pixieHandler(response, request, ps, configuration, state)
 		})
-
-
+	if configuration.StaleBuildCheckFrequency <= 0 {
+		configuration.StaleBuildCheckFrequency = 300
+	}
+    ticker := time.NewTicker(time.Duration(configuration.StaleBuildCheckFrequency) * time.Second)
+    
+    var wg sync.WaitGroup
+	wg.Add(1)
+	
+    go func() {
+        for _ = range ticker.C {
+            checkForStaleBuilds(state)
+        }
+        wg.Done()
+    }()
+    	
 	log.Println("Starting Server on " + *address + ":" + *port)
 	log.Fatal(http.ListenAndServe(*address + ":" + *port, handlers.LoggingHandler(os.Stdout, r)))
+
+	ticker.Stop()
+	wg.Wait()
 }

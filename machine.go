@@ -153,43 +153,24 @@ func (m Machine) setBuildMode(config Config, state State) error {
 	}
 	
 	// Perform any desired operations needed prior to setting build mode.
-	for _, buildCommand := range m.PreBuildCommands {
-
-		if buildCommand.TimeoutSeconds == 0 {
-			buildCommand.TimeoutSeconds = 5
-		}
+	if err := m.RunBuildCommands(m.PreBuildCommands); err != nil {
+		return err
+	}
 	
-		tpl, err := pongo2.FromString(buildCommand.Command)
-		if err != nil {
-			return err
-		}
-		
-		cmdline, err := tpl.Execute(pongo2.Context{"machine": m, "Token": uuid.String()})
-
-		if buildCommand.ShouldLog {
-			log.Println(cmdline)
-		}
-	
-		if err != nil {
-			return err
-		}
-		
-		// Now actually execute the command and return err if ErrorsFatal
-		out, err := m.TimedCommandOutput(time.Duration(buildCommand.TimeoutSeconds) * time.Second, cmdline)
-
-		if err != nil && buildCommand.ErrorsFatal {
-			return errors.New(err.Error() + ":" + string(out))
-		}
-	}		
-	
+	state.Mux.Lock()
 	state.Tokens[m.Hostname] = uuid.String()
+	state.BuildIdMac[uuid.String()] = fmt.Sprintf("%s", m.Network[0].MacAddress)
 	log.Println(fmt.Sprintf("%s installation token: %s", m.Hostname, state.Tokens[m.Hostname]))
 	// Add token to machine struct
 	m.Token = state.Tokens[m.Hostname]
 	//Add to the MachineBuild table
-	state.MachineBuild[fmt.Sprintf("%s", m.Network[0].MacAddress)] = m.Hostname
+	state.MachineBuild[fmt.Sprintf("%s", m.Network[0].MacAddress)] = &m
+	//Add to the MachineBuildTime table
+	state.MachineBuildTime[fmt.Sprintf("%s", m.Network[0].MacAddress)] = time.Now()
 	//Change machine state
 	state.MachineState[m.Hostname] = "Installing"
+	state.Mux.Unlock()
+
 	return nil
 }
 
@@ -198,46 +179,25 @@ cancelBuild remove the machines mac address from the MachineBuild map
 which stops waitron from serving the PixieConfig used by pixiecore
 */
 func (m Machine) cancelBuildMode(config Config, state State) error {
+	
+	state.Mux.Lock()
 	//Delete mac from the building map
 	delete(state.MachineBuild, fmt.Sprintf("%s", m.Network[0].MacAddress))
+	delete(state.MachineBuildTime, fmt.Sprintf("%s", m.Network[0].MacAddress))
+	delete(state.BuildIdMac, m.Token)
+	
 	//Change machine state
 	state.MachineState[m.Hostname] = "Installed"
+	state.Mux.Unlock()
 
 	// Perform any desired operations needed after a machine has been taken out of build mode.
-	for _, buildCommand := range m.PostBuildCommands {
-
-		if buildCommand.TimeoutSeconds == 0 {
-			buildCommand.TimeoutSeconds = 5
-		}
-	
-		tpl, err := pongo2.FromString(buildCommand.Command)
-		if err != nil {
-			return err
-		}
+	err := m.RunBuildCommands(m.PostBuildCommands)
 		
-		cmdline, err := tpl.Execute(pongo2.Context{"machine": m, "Token": m.Token})
-
-		if buildCommand.ShouldLog {
-			log.Println(cmdline)
-		}
-	
-		if err != nil {
-			return err
-		}
-		
-		// Now actually execute the command and return err if ErrorsFatal
-		out, err := m.TimedCommandOutput(time.Duration(buildCommand.TimeoutSeconds) * time.Second, cmdline)
-
-		if err != nil && buildCommand.ErrorsFatal {
-			return errors.New(err.Error() + ":" + string(out))
-		}
-	}		
-	
-	return nil
+	return err
 }
 
 // Builds pxe config to be sent to pixiecore
-func (m Machine) pixieInit(config Config) (PixieConfig, error) {
+func (m Machine) pixieInit() (PixieConfig, error) {
 	pixieConfig := PixieConfig{}
 	tpl, err := pongo2.FromString(m.Cmdline)
 	if err != nil {
@@ -267,4 +227,37 @@ func (m Machine) TimedCommandOutput(timeout time.Duration, command string) (out 
     out, err = cmd.Output()
    
     return out, err
+}
+
+func (m Machine) RunBuildCommands(b []BuildCommand) error {
+	for _, buildCommand := range b {
+
+		if buildCommand.TimeoutSeconds == 0 {
+			buildCommand.TimeoutSeconds = 5
+		}
+	
+		tpl, err := pongo2.FromString(buildCommand.Command)
+		if err != nil {
+			return err
+		}
+		
+		cmdline, err := tpl.Execute(pongo2.Context{"machine": m, "Token": m.Token})
+
+		if buildCommand.ShouldLog {
+			log.Println(cmdline)
+		}
+	
+		if err != nil {
+			return err
+		}
+		
+		// Now actually execute the command and return err if ErrorsFatal
+		out, err := m.TimedCommandOutput(time.Duration(buildCommand.TimeoutSeconds) * time.Second, cmdline)
+
+		if err != nil && buildCommand.ErrorsFatal {
+			return errors.New(err.Error() + ":" + string(out))
+		}
+	}
+	
+	return nil
 }
