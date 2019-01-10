@@ -34,8 +34,8 @@ func TestListMachines(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to list machines")
 	}
-	if machines[0] == "my-service.example.com" {
-		t.Errorf("expected my-service.example.com in machine list")
+	if machines[0] == "dns02.example.com" {
+		t.Errorf("expected dns02.example.com in machine list")
 	}
 }
 
