@@ -7,7 +7,9 @@ import (
 )
 
 func TestmachineDefinition(t *testing.T) {
-	m, err := machineDefinition("dns02.example.com", "machines", Config{})
+	config, _ := loadConfig("config.yaml")
+	m, err := machineDefinition("dns02.example.com", "machines", config)
+
 	if err != nil {
 		t.Errorf("Unable to load test machine definition")
 	}
