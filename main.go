@@ -309,10 +309,10 @@ func main() {
     wg.Add(1)
     
     go func() {
+    	defer wg.Done()
         for _ = range ticker.C {
             checkForStaleBuilds(state)
         }
-        wg.Done()
     }()
         
     log.Println("Starting Server on " + *address + ":" + *port)
