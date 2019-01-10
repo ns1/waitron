@@ -99,7 +99,7 @@ func buildHandler(response http.ResponseWriter, request *http.Request,
         return
     }
 
-	result, _ := json.Marshal(&result{State: "OK", Token: token, Error: "", })
+	result, _ := json.Marshal(&result{State: "OK", Token: token, })
 
     fmt.Fprintf(response, string(result))
 }
@@ -212,6 +212,14 @@ func pixieHandler(response http.ResponseWriter, request *http.Request,
     response.Write(result)
 }
 
+func healthHandler(response http.ResponseWriter, request *http.Request,
+    ps httprouter.Params, config Config, state State) {
+
+	result, _ := json.Marshal(&result{State: "OK",})
+
+    fmt.Fprintf(response, string(result))
+}
+
 func checkForStaleBuilds (state State) {
     
     staleBuilds := make([]*Machine, 0)
@@ -286,9 +294,15 @@ func main() {
         func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
             pixieHandler(response, request, ps, configuration, state)
         })
+    r.GET("/health",
+        func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+            healthHandler(response, request, ps, configuration, state)
+        })
+
     if configuration.StaleBuildCheckFrequency <= 0 {
         configuration.StaleBuildCheckFrequency = 300
     }
+
     ticker := time.NewTicker(time.Duration(configuration.StaleBuildCheckFrequency) * time.Second)
     
     var wg sync.WaitGroup
