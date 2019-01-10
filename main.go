@@ -47,7 +47,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request, ps htt
 
     // Get machine
     state.Mux.Lock()
-    m, found := state.MachineBuild[state.BuildIdMac[state.Tokens[hostname]]]
+    m, found := state.MachineByUUID[ps.ByName("token")]
     state.Mux.Unlock()
 
     if !found {
@@ -92,14 +92,16 @@ func buildHandler(response http.ResponseWriter, request *http.Request,
         return
     }
 
-    err = m.setBuildMode(config, state)
+    token, err := m.setBuildMode(config, state)
     if err != nil {
         log.Println(err)
         http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), 500)
         return
     }
 
-    fmt.Fprintf(response, "OK")
+	result, _ := json.Marshal(&result{State: "OK", Token: token, Error: "", })
+
+    fmt.Fprintf(response, string(result))
 }
 
 // @Title doneHandler
@@ -122,7 +124,7 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
 
     // Get machine
     state.Mux.Lock()
-    m, found := state.MachineBuild[state.BuildIdMac[state.Tokens[hostname]]]
+    m, found := state.MachineByUUID[ps.ByName("token")]
     state.Mux.Unlock()
 
     if !found {
@@ -148,12 +150,12 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
 // @Router /status/{hostname} [GET]
 func hostStatus(response http.ResponseWriter, request *http.Request,
     ps httprouter.Params, config Config, state State) {
-    status := state.MachineState[ps.ByName("hostname")]
-    if status == "" {
+    m, found := state.MachineByHostname[ps.ByName("hostname")]
+    if !found || m.Status == "" {
         http.Error(response, "Unknown state", 500)
         return
     }
-    fmt.Fprintf(response, status)
+    fmt.Fprintf(response, m.Status)
 }
 
 // @Title listMachinesHandler
@@ -179,7 +181,7 @@ func listMachinesHandler(response http.ResponseWriter, request *http.Request,
 // @Router /status [GET]
 func status(response http.ResponseWriter, request *http.Request,
     ps httprouter.Params, config Config, state State) {
-    result, _ := json.Marshal(&state.MachineState)
+    result, _ := json.Marshal(&state.MachineByHostname)
     response.Write(result)
 }
 
@@ -196,7 +198,7 @@ func pixieHandler(response http.ResponseWriter, request *http.Request,
     macaddr := ps.ByName("macaddr")
 
     state.Mux.Lock()
-    m, found := state.MachineBuild[macaddr]
+    m, found := state.MachineByMAC[macaddr]
     state.Mux.Unlock()
 
     if found == false {
@@ -216,9 +218,8 @@ func checkForStaleBuilds (state State) {
     
     state.Mux.Lock()
     
-    for macaddr, buildStartTime := range state.MachineBuildTime {
-        m :=  state.MachineBuild[macaddr]
-        if int(time.Now().Sub(buildStartTime).Seconds()) >= m.StaleBuildThresholdSeconds {
+    for _, m := range state.MachineByMAC {
+        if int(time.Now().Sub(m.BuildStart).Seconds()) >= m.StaleBuildThresholdSeconds {
             staleBuilds = append(staleBuilds, m)
         }
     }

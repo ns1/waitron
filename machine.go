@@ -24,6 +24,8 @@ type Machine struct {
     Domain          string
     Token           string // This is set by the service
     Network         []Interface `yaml:"network"`
+    Status           string
+    BuildStart		time.Time
 }
 
 type IPConfig struct {
@@ -127,7 +129,7 @@ func machineDefinition(hostname string, machinePath string, config Config) (Mach
     return m, nil
 }
 
-// Render template among with machine and config struct
+// Render templatewith machine and config struct
 func (m Machine) renderTemplate(template string, config Config) (string, error) {
 
     template = path.Join(config.TemplatePath, template)
@@ -144,34 +146,38 @@ func (m Machine) renderTemplate(template string, config Config) (string, error) 
 }
 
 // Posts machine macaddress to the forman proxy among with pxe configuration
-func (m Machine) setBuildMode(config Config, state State) error {
+func (m Machine) setBuildMode(config Config, state State) (string, error) {
     // Generate a random token used to authenticate requests
     uuid, err := uuid.NewV4();
     
     if err != nil {
-        return err
+        return "", err
     }
     
     // Perform any desired operations needed prior to setting build mode.
     if err := m.RunBuildCommands(m.PreBuildCommands); err != nil {
-        return err
+        return "", err
     }
     
-    state.Mux.Lock()
-    state.Tokens[m.Hostname] = uuid.String()
-    state.BuildIdMac[uuid.String()] = fmt.Sprintf("%s", m.Network[0].MacAddress)
     log.Println(fmt.Sprintf("%s installation token: %s", m.Hostname, state.Tokens[m.Hostname]))
+    
+    state.Mux.Lock()
+
+    state.Tokens[m.Hostname] = uuid.String()
     // Add token to machine struct
     m.Token = state.Tokens[m.Hostname]
-    //Add to the MachineBuild table
-    state.MachineBuild[fmt.Sprintf("%s", m.Network[0].MacAddress)] = &m
-    //Add to the MachineBuildTime table
-    state.MachineBuildTime[fmt.Sprintf("%s", m.Network[0].MacAddress)] = time.Now()
+
+    //Add to the Machine* tables
+    state.MachineByUUID[uuid.String()] = &m
+    state.MachineByMAC[fmt.Sprintf("%s", m.Network[0].MacAddress)] = &m
+    state.MachineByHostname[m.Hostname] = &m
+    m.BuildStart = time.Now()
     //Change machine state
-    state.MachineState[m.Hostname] = "Installing"
+    m.Status = "Installing"
+
     state.Mux.Unlock()
 
-    return nil
+    return m.Token, nil
 }
 
 /*
@@ -182,12 +188,12 @@ func (m Machine) cancelBuildMode(config Config, state State) error {
     
     state.Mux.Lock()
     //Delete mac from the building map
-    delete(state.MachineBuild, fmt.Sprintf("%s", m.Network[0].MacAddress))
-    delete(state.MachineBuildTime, fmt.Sprintf("%s", m.Network[0].MacAddress))
-    delete(state.BuildIdMac, m.Token)
+    delete(state.MachineByHostname, fmt.Sprintf("%s", m.Hostname))
+    delete(state.MachineByMAC, fmt.Sprintf("%s", m.Network[0].MacAddress))
+    delete(state.MachineByUUID, m.Token)
     
     //Change machine state
-    state.MachineState[m.Hostname] = "Installed"
+    m.Status = "Installed"
     state.Mux.Unlock()
 
     // Perform any desired operations needed after a machine has been taken out of build mode.

@@ -4,7 +4,6 @@ import (
     "gopkg.in/yaml.v2"
     "io/ioutil"
     "path"
-    "time"
     "sync"
 )
 
@@ -12,10 +11,9 @@ import (
 type State struct {
     Mux                 sync.Mutex
     Tokens              map[string]string
-    MachineState        map[string]string
-    MachineBuild        map[string]*Machine
-    MachineBuildTime    map[string]time.Time
-    BuildIdMac          map[string]string
+    MachineByUUID       map[string]*Machine
+    MachineByMAC        map[string]*Machine
+    MachineByHostname   map[string]*Machine
 }
 
 type BuildCommand struct {
@@ -65,12 +63,11 @@ func loadConfig(configPath string) (Config, error) {
 
 func loadState() (State) {
     var s State
-    // Initialize map containing hostname[token]
+    // Initialize maps
     s.Tokens = make(map[string]string)
-    s.MachineState = make(map[string]string)
-    s.MachineBuild = make(map[string]*Machine)
-    s.MachineBuildTime = make(map[string]time.Time)
-    s.BuildIdMac = make(map[string]string)
+    s.MachineByUUID = make(map[string]*Machine)
+    s.MachineByMAC = make(map[string]*Machine)
+    s.MachineByHostname = make(map[string]*Machine)
     return s
 }
 
