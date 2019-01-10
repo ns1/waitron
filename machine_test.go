@@ -7,21 +7,21 @@ import (
 )
 
 func TestmachineDefinition(t *testing.T) {
-	m, err := machineDefinition("my-service.example.com", "machines")
+	m, err := machineDefinition("dns02.example.com", "machines", Config{})
 	if err != nil {
 		t.Errorf("Unable to load test machine definition")
 	}
-	if m.Hostname != "my-service.example.com" {
-		t.Errorf("expected hostname: my-service.example.com")
+	if m.Hostname != "dns02.example.com" {
+		t.Errorf("expected hostname: dns02.example.com")
 	}
-	if m.ShortName != "my-service" {
+	if m.ShortName != "dns02" {
 		t.Errorf("invalid shortname")
 	}
 }
 
 func TestRenderTemplate(t *testing.T) {
 	config, _ := loadConfig("config.yaml")
-	m, _ := machineDefinition("my-service.example.com", "machines")
+	m, _ := machineDefinition("dns02.example.com", "machines", Config{})
 
 	template, err := m.renderTemplate("finish.j2", config)
 	if err != nil {
@@ -36,7 +36,7 @@ func TestRenderTemplate(t *testing.T) {
 
 func TestRenderTemplateNotFound(t *testing.T) {
 	config, _ := loadConfig("config.yaml")
-	m, _ := machineDefinition("my-service.example.com", "machines")
+	m, _ := machineDefinition("dns02.example.com", "machines", Config{})
 	_, err := m.renderTemplate("invalid.j2", config)
 
 	expected := "Template does not exist"
