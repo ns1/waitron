@@ -105,7 +105,7 @@ func buildHandler(response http.ResponseWriter, request *http.Request,
 }
 
 // @Title doneHandler
-// @Description Removes the server from build mode
+// @Description Removes the server from build mode and runs post-build comands related to normal install completion.
 // @Param hostname    path    string    true    "Hostname"
 // @Param token        path    string    true    "Token"
 // @Success 200    {object} string "OK"
@@ -143,7 +143,7 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
 }
 
 // @Title cancelHandler
-// @Description Removes the server from build mode
+// @Description Removes the server from build mode and runs post-build commands related to requested build terminations.
 // @Param hostname    path    string    true    "Hostname"
 // @Param token        path    string    true    "Token"
 // @Success 200    {object} string "OK"
@@ -249,6 +249,14 @@ func pixieHandler(response http.ResponseWriter, request *http.Request,
     result, _ := json.Marshal(pxeconfig)
     response.Write(result)
 }
+
+// @Title healthHandler
+// @Description Dictionary with kernel, intrd(s) and commandline for pixiecore
+// @Param macaddr    path    string    true    "MacAddress"
+// @Success 200    {object} string "Dictionary with kernel, intrd(s) and commandline for pixiecore"
+// @Failure 404    {object} string "Not in build mode"
+// @Failure 500    {object} string "Unable to find host definition for hostname"
+// @Router /v1/boot/{macaddr} [GET]
 
 func healthHandler(response http.ResponseWriter, request *http.Request,
     ps httprouter.Params, config Config, state State) {
