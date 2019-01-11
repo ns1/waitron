@@ -181,10 +181,10 @@ func (m Machine) setBuildMode(config Config, state State) (string, error) {
 }
 
 /*
-cancelBuild remove the machines mac address from the MachineBuild map
+should remove the machines mac address from the MachineBy* maps
 which stops waitron from serving the PixieConfig used by pixiecore
 */
-func (m Machine) cancelBuildMode(config Config, state State) error {
+func (m Machine) finishBuildMode(config Config, state State) error {
     
     state.Mux.Lock()
     //Delete mac from the building map
@@ -196,8 +196,31 @@ func (m Machine) cancelBuildMode(config Config, state State) error {
     m.Status = "Installed"
     state.Mux.Unlock()
 
-    // Perform any desired operations needed after a machine has been taken out of build mode.
+    // Perform any desired operations needed after a machine has been taken out of build mode because install has completed.
     err := m.RunBuildCommands(m.PostBuildCommands)
+        
+    return err
+}
+
+
+/*
+Should remove the machines mac address from the MachineBuild map
+which stops waitron from serving the PixieConfig used by pixiecore
+*/
+func (m Machine) cancelBuildMode(config Config, state State) error {
+    
+    state.Mux.Lock()
+    //Delete mac from the building map
+    delete(state.MachineByHostname, fmt.Sprintf("%s", m.Hostname))
+    delete(state.MachineByMAC, fmt.Sprintf("%s", m.Network[0].MacAddress))
+    delete(state.MachineByUUID, m.Token)
+    
+    //Change machine state
+    m.Status = "Cancelled"
+    state.Mux.Unlock()
+
+    // Perform any desired operations needed after a machine has been taken out of build mode by request.
+    err := m.RunBuildCommands(m.CancelBuildCommands)
         
     return err
 }

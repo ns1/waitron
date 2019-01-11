@@ -43,6 +43,7 @@ type Config struct {
     StaleBuildCommands          []BuildCommand `yaml:"stalebuild_commands"`
     PreBuildCommands            []BuildCommand `yaml:"prebuild_commands"`
     PostBuildCommands           []BuildCommand `yaml:"postbuild_commands"`
+    CancelBuildCommands         []BuildCommand `yaml:"cancelbuild_commands"`
 }
 
 // Loads config.yaml and returns a Config struct

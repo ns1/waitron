@@ -109,11 +109,49 @@ func buildHandler(response http.ResponseWriter, request *http.Request,
 // @Param hostname    path    string    true    "Hostname"
 // @Param token        path    string    true    "Token"
 // @Success 200    {object} string "OK"
-// @Failure 500    {object} string "Failed to cancel build mode"
+// @Failure 500    {object} string "Failed to finish build mode"
 // @Failure 400    {object} string "Not in build mode or definition does not exist"
 // @Failure 401    {object} string "Invalid token"
 // @Router /done/{hostname}/{token} [GET]
 func doneHandler(response http.ResponseWriter, request *http.Request,
+    ps httprouter.Params, config Config, state State) {
+    hostname := ps.ByName("hostname")
+
+    if ps.ByName("token") != state.Tokens[hostname] {
+        http.Error(response, "Invalid Token", 401)
+        return
+    }
+
+    // Get machine
+    state.Mux.Lock()
+    m, found := state.MachineByUUID[ps.ByName("token")]
+    state.Mux.Unlock()
+
+    if !found {
+        http.Error(response, "Not in build mode or definition does not exist", 400)
+        return
+    }
+
+    err := m.finishBuildMode(config, state)
+    if err != nil {
+        log.Println(err)
+        http.Error(response, "Failed to finish build mode", 500)
+        return
+    }
+
+    fmt.Fprintf(response, "OK")
+}
+
+// @Title cancelHandler
+// @Description Removes the server from build mode
+// @Param hostname    path    string    true    "Hostname"
+// @Param token        path    string    true    "Token"
+// @Success 200    {object} string "OK"
+// @Failure 500    {object} string "Failed to cancel build mode"
+// @Failure 400    {object} string "Not in build mode or definition does not exist"
+// @Failure 401    {object} string "Invalid token"
+// @Router /done/{hostname}/{token} [GET]
+func cancelHandler(response http.ResponseWriter, request *http.Request,
     ps httprouter.Params, config Config, state State) {
     hostname := ps.ByName("hostname")
 
@@ -285,6 +323,10 @@ func main() {
     r.GET("/done/:hostname/:token",
         func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
             doneHandler(response, request, ps, configuration, state)
+        })
+    r.GET("/done/:hostname/:token",
+        func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+            cancelHandler(response, request, ps, configuration, state)
         })
     r.GET("/template/:template/:hostname/:token",
         func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
