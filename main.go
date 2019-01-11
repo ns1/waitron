@@ -132,7 +132,7 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
         return
     }
 
-    err := m.finishBuildMode(config, state)
+    err := m.doneBuildMode(config, state)
     if err != nil {
         log.Println(err)
         http.Error(response, "Failed to finish build mode", 500)
@@ -150,7 +150,7 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
 // @Failure 500    {object} string "Failed to cancel build mode"
 // @Failure 400    {object} string "Not in build mode or definition does not exist"
 // @Failure 401    {object} string "Invalid token"
-// @Router /done/{hostname}/{token} [GET]
+// @Router /cancel/{hostname}/{token} [GET]
 func cancelHandler(response http.ResponseWriter, request *http.Request,
     ps httprouter.Params, config Config, state State) {
     hostname := ps.ByName("hostname")
@@ -324,7 +324,7 @@ func main() {
         func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
             doneHandler(response, request, ps, configuration, state)
         })
-    r.GET("/done/:hostname/:token",
+    r.GET("/cancel/:hostname/:token",
         func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
             cancelHandler(response, request, ps, configuration, state)
         })
