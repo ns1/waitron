@@ -77,7 +77,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request, ps htt
 // @Title buildHandler
 // @Description Put the server in build mode
 // @Param hostname    path    string    true    "Hostname"
-// @Success 200    {object} string "OK"
+// @Success 200    {object} string "{"State": "OK", "Token": <UUID of the build>}"
 // @Failure 500    {object} string "Unable to find host definition for hostname"
 // @Failure 500    {object} string "Failed to set build mode on hostname"
 // @Router build/{hostname} [PUT]
@@ -108,7 +108,7 @@ func buildHandler(response http.ResponseWriter, request *http.Request,
 // @Description Removes the server from build mode and runs post-build comands related to normal install completion.
 // @Param hostname    path    string    true    "Hostname"
 // @Param token        path    string    true    "Token"
-// @Success 200    {object} string "OK"
+// @Success 200    {object} string "{"State": "OK"}"
 // @Failure 500    {object} string "Failed to finish build mode"
 // @Failure 400    {object} string "Not in build mode or definition does not exist"
 // @Failure 401    {object} string "Invalid token"
@@ -139,14 +139,16 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
         return
     }
 
-    fmt.Fprintf(response, "OK")
+	result, _ := json.Marshal(&result{State: "OK",})
+
+    fmt.Fprintf(response, string(result))
 }
 
 // @Title cancelHandler
 // @Description Removes the server from build mode and runs post-build commands related to requested build terminations.
 // @Param hostname    path    string    true    "Hostname"
 // @Param token        path    string    true    "Token"
-// @Success 200    {object} string "OK"
+// @Success 200    {object} string "{"State": "OK"}"
 // @Failure 500    {object} string "Failed to cancel build mode"
 // @Failure 400    {object} string "Not in build mode or definition does not exist"
 // @Failure 401    {object} string "Invalid token"
@@ -176,8 +178,10 @@ func cancelHandler(response http.ResponseWriter, request *http.Request,
         http.Error(response, "Failed to cancel build mode", 500)
         return
     }
+    
+	result, _ := json.Marshal(&result{State: "OK",})
 
-    fmt.Fprintf(response, "OK")
+    fmt.Fprintf(response, string(result))
 }
 
 // @Title hostStatus
@@ -251,13 +255,8 @@ func pixieHandler(response http.ResponseWriter, request *http.Request,
 }
 
 // @Title healthHandler
-// @Description Dictionary with kernel, intrd(s) and commandline for pixiecore
-// @Param macaddr    path    string    true    "MacAddress"
-// @Success 200    {object} string "Dictionary with kernel, intrd(s) and commandline for pixiecore"
-// @Failure 404    {object} string "Not in build mode"
-// @Failure 500    {object} string "Unable to find host definition for hostname"
-// @Router /v1/boot/{macaddr} [GET]
-
+// @Success 200    {object} string "{"State": "OK"}"
+// @Router /health [GET]
 func healthHandler(response http.ResponseWriter, request *http.Request,
     ps httprouter.Params, config Config, state State) {
 

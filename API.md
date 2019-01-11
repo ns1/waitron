@@ -5,7 +5,9 @@ Templates for server provisioning
 Table of Contents
 
 1. [Put the server in build mode](#build)
-1. [Removes the server from build mode](#done)
+1. [Removes the server from build mode and runs post-build commands related to requested build terminations.](#cancel)
+1. [Removes the server from build mode and runs post-build comands related to normal install completion.](#done)
+1. [health](#health)
 1. [List machines handled by waitron](#list)
 1. [Build status of the server](#status)
 1. [Renders either the finish or the preseed template](#template)
@@ -50,14 +52,55 @@ Put the server in build mode
 
 | Code | Type | Model | Message |
 |-----|-----|-----|-----|
-| 200 | object | string | OK |
+| 200 | object | string | {"State": "OK", "Token": <UUID of the build>} |
 | 500 | object | string | Unable to find host definition for hostname |
 | 500 | object | string | Failed to set build mode on hostname |
 
 
+<a name="cancel"></a>
+
+## cancel
+
+| Specification | Value |
+|-----|-----|
+| Resource Path | /cancel |
+| API Version |  |
+| BasePath for the API | {{.}} |
+| Consumes |  |
+| Produces |  |
 
 
-### Models
+
+### Operations
+
+
+| Resource Path | Operation | Description |
+|-----|-----|-----|
+| /cancel/\{hostname\}/\{token\} | [GET](#cancelHandler) | Removes the server from build mode and runs post-build commands related to requested build terminations. |
+
+
+
+<a name="cancelHandler"></a>
+
+#### API: /cancel/\{hostname\}/\{token\} (GET)
+
+
+Removes the server from build mode and runs post-build commands related to requested build terminations.
+
+
+
+| Param Name | Param Type | Data Type | Description | Required? |
+|-----|-----|-----|-----|-----|
+| hostname | path | string | Hostname | Yes |
+| token | path | string | Token | Yes |
+
+
+| Code | Type | Model | Message |
+|-----|-----|-----|-----|
+| 200 | object | string | {"State": "OK"} |
+| 500 | object | string | Failed to cancel build mode |
+| 400 | object | string | Not in build mode or definition does not exist |
+| 401 | object | string | Invalid token |
 
 
 <a name="done"></a>
@@ -79,7 +122,7 @@ Put the server in build mode
 
 | Resource Path | Operation | Description |
 |-----|-----|-----|
-| /done/\{hostname\}/\{token\} | [GET](#doneHandler) | Removes the server from build mode |
+| /done/\{hostname\}/\{token\} | [GET](#doneHandler) | Removes the server from build mode and runs post-build comands related to normal install completion. |
 
 
 
@@ -88,7 +131,7 @@ Put the server in build mode
 #### API: /done/\{hostname\}/\{token\} (GET)
 
 
-Removes the server from build mode
+Removes the server from build mode and runs post-build comands related to normal install completion.
 
 
 
@@ -100,15 +143,47 @@ Removes the server from build mode
 
 | Code | Type | Model | Message |
 |-----|-----|-----|-----|
-| 200 | object | string | OK |
-| 500 | object | string | Unable to find host definition for hostname |
-| 500 | object | string | Failed to cancel build mode |
+| 200 | object | string | {"State": "OK"} |
+| 500 | object | string | Failed to finish build mode |
+| 400 | object | string | Not in build mode or definition does not exist |
 | 401 | object | string | Invalid token |
 
 
+<a name="health"></a>
+
+## health
+
+| Specification | Value |
+|-----|-----|
+| Resource Path | /health |
+| API Version |  |
+| BasePath for the API | {{.}} |
+| Consumes |  |
+| Produces |  |
 
 
-### Models
+
+### Operations
+
+
+| Resource Path | Operation | Description |
+|-----|-----|-----|
+| /health | [GET](#healthHandler) |  |
+
+
+
+<a name="healthHandler"></a>
+
+#### API: /health (GET)
+
+
+
+
+
+
+| Code | Type | Model | Message |
+|-----|-----|-----|-----|
+| 200 | object | string | {"State": "OK"} |
 
 
 <a name="list"></a>
@@ -147,11 +222,6 @@ List machines handled by waitron
 |-----|-----|-----|-----|
 | 200 | array | string | List of machines |
 | 500 | object | string | Unable to list machines |
-
-
-
-
-### Models
 
 
 <a name="status"></a>
@@ -212,11 +282,6 @@ Dictionary with machines and its status
 | 200 | object | string | Dictionary with machines and its status |
 
 
-
-
-### Models
-
-
 <a name="template"></a>
 
 ## template
@@ -259,14 +324,9 @@ Renders either the finish or the preseed template
 | Code | Type | Model | Message |
 |-----|-----|-----|-----|
 | 200 | object | string | Rendered template |
-| 400 | object | string | Unable to find host definition for hostname |
+| 400 | object | string | Not in build mode or definition does not exist |
 | 400 | object | string | Unable to render template |
 | 401 | object | string | Invalid token |
-
-
-
-
-### Models
 
 
 <a name="v1"></a>
@@ -311,10 +371,5 @@ Dictionary with kernel, intrd(s) and commandline for pixiecore
 | 200 | object | string | Dictionary with kernel, intrd(s) and commandline for pixiecore |
 | 404 | object | string | Not in build mode |
 | 500 | object | string | Unable to find host definition for hostname |
-
-
-
-
-### Models
 
 
