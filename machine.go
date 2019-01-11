@@ -159,11 +159,12 @@ func (m Machine) setBuildMode(config Config, state State) (string, error) {
         return "", err
     }
     
-    log.Println(fmt.Sprintf("%s installation token: %s", m.Hostname, state.Tokens[m.Hostname]))
     
     state.Mux.Lock()
 
     state.Tokens[m.Hostname] = uuid.String()
+    log.Println(fmt.Sprintf("%s installation token: %s", m.Hostname, state.Tokens[m.Hostname]))
+
     // Add token to machine struct
     m.Token = state.Tokens[m.Hostname]
 
