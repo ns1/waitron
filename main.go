@@ -77,7 +77,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request, ps htt
 // @Title buildHandler
 // @Description Put the server in build mode
 // @Param hostname    path    string    true    "Hostname"
-// @Success 200    {object} string "OK"
+// @Success 200    {object} string "{"State": "OK", "Token": <UUID of the build>}"
 // @Failure 500    {object} string "Unable to find host definition for hostname"
 // @Failure 500    {object} string "Failed to set build mode on hostname"
 // @Router build/{hostname} [PUT]
@@ -105,15 +105,55 @@ func buildHandler(response http.ResponseWriter, request *http.Request,
 }
 
 // @Title doneHandler
-// @Description Removes the server from build mode
+// @Description Removes the server from build mode and runs post-build comands related to normal install completion.
 // @Param hostname    path    string    true    "Hostname"
 // @Param token        path    string    true    "Token"
-// @Success 200    {object} string "OK"
-// @Failure 500    {object} string "Failed to cancel build mode"
+// @Success 200    {object} string "{"State": "OK"}"
+// @Failure 500    {object} string "Failed to finish build mode"
 // @Failure 400    {object} string "Not in build mode or definition does not exist"
 // @Failure 401    {object} string "Invalid token"
 // @Router /done/{hostname}/{token} [GET]
 func doneHandler(response http.ResponseWriter, request *http.Request,
+    ps httprouter.Params, config Config, state State) {
+    hostname := ps.ByName("hostname")
+
+    if ps.ByName("token") != state.Tokens[hostname] {
+        http.Error(response, "Invalid Token", 401)
+        return
+    }
+
+    // Get machine
+    state.Mux.Lock()
+    m, found := state.MachineByUUID[ps.ByName("token")]
+    state.Mux.Unlock()
+
+    if !found {
+        http.Error(response, "Not in build mode or definition does not exist", 400)
+        return
+    }
+
+    err := m.doneBuildMode(config, state)
+    if err != nil {
+        log.Println(err)
+        http.Error(response, "Failed to finish build mode", 500)
+        return
+    }
+
+	result, _ := json.Marshal(&result{State: "OK",})
+
+    fmt.Fprintf(response, string(result))
+}
+
+// @Title cancelHandler
+// @Description Removes the server from build mode and runs post-build commands related to requested build terminations.
+// @Param hostname    path    string    true    "Hostname"
+// @Param token        path    string    true    "Token"
+// @Success 200    {object} string "{"State": "OK"}"
+// @Failure 500    {object} string "Failed to cancel build mode"
+// @Failure 400    {object} string "Not in build mode or definition does not exist"
+// @Failure 401    {object} string "Invalid token"
+// @Router /cancel/{hostname}/{token} [GET]
+func cancelHandler(response http.ResponseWriter, request *http.Request,
     ps httprouter.Params, config Config, state State) {
     hostname := ps.ByName("hostname")
 
@@ -138,8 +178,10 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
         http.Error(response, "Failed to cancel build mode", 500)
         return
     }
+    
+	result, _ := json.Marshal(&result{State: "OK",})
 
-    fmt.Fprintf(response, "OK")
+    fmt.Fprintf(response, string(result))
 }
 
 // @Title hostStatus
@@ -212,6 +254,9 @@ func pixieHandler(response http.ResponseWriter, request *http.Request,
     response.Write(result)
 }
 
+// @Title healthHandler
+// @Success 200    {object} string "{"State": "OK"}"
+// @Router /health [GET]
 func healthHandler(response http.ResponseWriter, request *http.Request,
     ps httprouter.Params, config Config, state State) {
 
@@ -285,6 +330,10 @@ func main() {
     r.GET("/done/:hostname/:token",
         func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
             doneHandler(response, request, ps, configuration, state)
+        })
+    r.GET("/cancel/:hostname/:token",
+        func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+            cancelHandler(response, request, ps, configuration, state)
         })
     r.GET("/template/:template/:hostname/:token",
         func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
