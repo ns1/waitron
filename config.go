@@ -27,7 +27,7 @@ type Config struct {
     TemplatePath        string
     GroupPath           string
     MachinePath         string
-    StaticFilesPath		string `yaml:"staticspath"`
+    StaticFilesPath	    string `yaml:"staticspath"`
     BaseURL             string
     ForemanProxyAddress string `yaml:"foreman_proxy_address"`
 
