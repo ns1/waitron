@@ -24,7 +24,7 @@ type result struct {
 }
 
 // @Title templateHandler
-// @Description Renders either the finish or the preseed template
+// @Description Render either the finish or the preseed template
 // @Param hostname    path    string    true    "Hostname"
 // @Param template    path    string    true    "The template to be rendered"
 // @Param token        path    string    true    "Token"
@@ -108,7 +108,7 @@ func buildHandler(response http.ResponseWriter, request *http.Request,
 // @Success 200    {object} string "{"State": "OK", "Token": <UUID of the build>}"
 // @Failure 500    {object} string "Unable to find host definition for hostname"
 // @Failure 500    {object} string "Failed to set build mode for rescue on hostname"
-// @Router build/{hostname} [PUT]
+// @Router rescue/{hostname} [PUT]
 func rescueHandler(response http.ResponseWriter, request *http.Request,
     ps httprouter.Params, config Config, state State) {
     hostname := ps.ByName("hostname")
@@ -135,7 +135,7 @@ func rescueHandler(response http.ResponseWriter, request *http.Request,
 }
 
 // @Title doneHandler
-// @Description Removes the server from build mode and runs post-build comands related to normal install completion.
+// @Description Remove the server from build mode
 // @Param hostname    path    string    true    "Hostname"
 // @Param token        path    string    true    "Token"
 // @Success 200    {object} string "{"State": "OK"}"
@@ -175,7 +175,7 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
 }
 
 // @Title cancelHandler
-// @Description Removes the server from build mode and runs post-build commands related to requested build terminations.
+// @Description Remove the server from build mode
 // @Param hostname    path    string    true    "Hostname"
 // @Param token        path    string    true    "Token"
 // @Success 200    {object} string "{"State": "OK"}"
@@ -285,6 +285,7 @@ func pixieHandler(response http.ResponseWriter, request *http.Request,
 }
 
 // @Title healthHandler
+// @Description Check that Waitron is running
 // @Success 200    {object} string "{"State": "OK"}"
 // @Router /health [GET]
 func healthHandler(response http.ResponseWriter, request *http.Request,
