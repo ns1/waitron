@@ -26,6 +26,7 @@ type Machine struct {
     Network         []Interface `yaml:"network"`
     Status           string
     BuildStart		time.Time
+    RescueMode		bool
 }
 
 type IPConfig struct {
@@ -145,7 +146,6 @@ func (m Machine) renderTemplate(template string, config Config) (string, error) 
     return result, err
 }
 
-// Posts machine macaddress to the forman proxy among with pxe configuration
 func (m Machine) setBuildMode(config Config, state State) (string, error) {
     // Generate a random token used to authenticate requests
     uuid, err := uuid.NewV4();
@@ -231,17 +231,33 @@ func (m Machine) cancelBuildMode(config Config, state State) error {
 // Builds pxe config to be sent to pixiecore
 func (m Machine) pixieInit() (PixieConfig, error) {
     pixieConfig := PixieConfig{}
-    tpl, err := pongo2.FromString(m.Cmdline)
+    
+    var cmdline, imageURL, kernel, initrd string
+        
+    if m.RescueMode {
+    	cmdline = m.RescueCmdline
+    	imageURL = m.RescueImageURL
+    	kernel = m.RescueKernel
+    	initrd = m.RescueInitrd
+    } else {
+    	cmdline = m.Cmdline
+    	imageURL = m.ImageURL
+    	kernel = m.Kernel  	
+    	initrd = m.Initrd    	
+    }
+    
+    tpl, err := pongo2.FromString(cmdline)
     if err != nil {
         return pixieConfig, err
     }
-    cmdline, err := tpl.Execute(pongo2.Context{"machine": m, "BaseURL": m.BaseURL, "Hostname": m.Hostname, "Token": m.Token})
+    
+    cmdline, err = tpl.Execute(pongo2.Context{"machine": m, "BaseURL": m.BaseURL, "Hostname": m.Hostname, "Token": m.Token})
     if err != nil {
         return pixieConfig, err
     }
 
-    pixieConfig.Kernel = m.ImageURL+m.Kernel
-    pixieConfig.Initrd = []string{m.ImageURL+m.Initrd}
+    pixieConfig.Kernel = imageURL+kernel
+    pixieConfig.Initrd = []string{imageURL+initrd}
     pixieConfig.Cmdline = cmdline
 
     return pixieConfig, nil

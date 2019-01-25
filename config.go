@@ -27,12 +27,20 @@ type Config struct {
     TemplatePath        string
     GroupPath           string
     MachinePath         string
+    StaticFilesPath		string `yaml:"staticspath"`
     BaseURL             string
     ForemanProxyAddress string `yaml:"foreman_proxy_address"`
+
     Cmdline             string `yaml:"cmdline"`
     Kernel              string `yaml:"kernel"`
     Initrd              string `yaml:"initrd"`
     ImageURL            string `yaml:"image_url"`
+
+    RescueCmdline       string `yaml:"rescue_cmdline"`
+    RescueKernel        string `yaml:"rescue_kernel"`
+    RescueInitrd        string `yaml:"rescue_initrd"`
+    RescueImageURL      string `yaml:"rescue_image_url"`
+
     OperatingSystem     string
     Finish              string
     Preseed             string

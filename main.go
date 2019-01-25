@@ -6,17 +6,15 @@ package main
 // @LicenseUrl http://opensource.org/licenses/BSD-2-Clause
 import (
     "encoding/json"
+    "flag"
     "fmt"
+    "github.com/gorilla/handlers"
+    "github.com/julienschmidt/httprouter"
     "log"
     "net/http"
     "os"
-
-    "github.com/gorilla/handlers"
-    "github.com/julienschmidt/httprouter"
-    "flag"
-    
+    "sync"  
     "time"
-    "sync"
 )
 
 type result struct {
@@ -96,6 +94,38 @@ func buildHandler(response http.ResponseWriter, request *http.Request,
     if err != nil {
         log.Println(err)
         http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), 500)
+        return
+    }
+
+	result, _ := json.Marshal(&result{State: "OK", Token: token, })
+
+    fmt.Fprintf(response, string(result))
+}
+
+// @Title rescueHandler
+// @Description Put the server in build mode for a rescue boot
+// @Param hostname    path    string    true    "Hostname"
+// @Success 200    {object} string "{"State": "OK", "Token": <UUID of the build>}"
+// @Failure 500    {object} string "Unable to find host definition for hostname"
+// @Failure 500    {object} string "Failed to set build mode for rescue on hostname"
+// @Router build/{hostname} [PUT]
+func rescueHandler(response http.ResponseWriter, request *http.Request,
+    ps httprouter.Params, config Config, state State) {
+    hostname := ps.ByName("hostname")
+
+    m, err := machineDefinition(hostname, config.MachinePath, config)
+    if err != nil {
+        log.Println(err)
+        http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 500)
+        return
+    }
+    
+    m.RescueMode = true
+
+    token, err := m.setBuildMode(config, state)
+    if err != nil {
+        log.Println(err)
+        http.Error(response, fmt.Sprintf("Failed to set build mode for rescue on %s", hostname), 500)
         return
     }
 
@@ -319,6 +349,10 @@ func main() {
         func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
             buildHandler(response, request, ps, configuration, state)
         })
+    r.GET("/rescue/:hostname",
+        func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+            rescueHandler(response, request, ps, configuration, state)
+        })
     r.GET("/status/:hostname",
         func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
             hostStatus(response, request, ps, configuration, state)
@@ -348,6 +382,12 @@ func main() {
             healthHandler(response, request, ps, configuration, state)
         })
 
+	if configuration.StaticFilesPath != "" {
+		fs := http.FileServer(http.Dir(configuration.StaticFilesPath))
+		r.Handler("GET", "/files/:filename", http.StripPrefix("/files/", fs))
+	    log.Println("Serving static files from " + configuration.StaticFilesPath)
+	}
+
     if configuration.StaleBuildCheckFrequency <= 0 {
         configuration.StaleBuildCheckFrequency = 300
     }
@@ -363,7 +403,7 @@ func main() {
             checkForStaleBuilds(state)
         }
     }()
-        
+
     log.Println("Starting Server on " + *address + ":" + *port)
     log.Fatal(http.ListenAndServe(*address + ":" + *port, handlers.LoggingHandler(os.Stdout, r)))
 
