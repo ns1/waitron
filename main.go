@@ -8,19 +8,26 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/gorilla/handlers"
-	"github.com/julienschmidt/httprouter"
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"sync"
 	"time"
+
+	"github.com/gorilla/handlers"
+	"github.com/julienschmidt/httprouter"
 )
 
 type result struct {
 	Token string `json:",omitempty"`
 	Error string `json:",omitempty"`
 	State string `json:",omitempty"`
+}
+
+type HttpResponse struct {
+	Message    string
+	StatusCode int
 }
 
 // @Title templateHandler
@@ -56,20 +63,81 @@ func templateHandler(response http.ResponseWriter, request *http.Request, ps htt
 
 	// Render preseed as default
 	var template string
-	if ps.ByName("template") == "finish" {
-		template = m.Finish
-	} else {
-		template = m.Preseed
+
+	switch ps.ByName("template") {
+	case "preseed":
+		template = path.Join(config.TemplatePath, m.Preseed)
+
+		hookType := "pre-hook"
+		err := executeHooks(hookType, m, config)
+		if err != nil {
+			log.Println(err)
+			http.Error(response, fmt.Sprintf("Cannot execute pre hooks"), 500)
+			return
+		}
+
+	case "finish":
+		template = path.Join(config.TemplatePath, m.Finish)
+	case "cloud-init":
+		template = path.Join(config.MachinePath, hostname+".cloud-init")
 	}
 
 	renderedTemplate, err := m.renderTemplate(template, config)
 	if err != nil {
 		log.Println(err)
-		http.Error(response, "Unable to render template", 400)
+		http.Error(response, "Unable to render template", http.StatusInternalServerError)
 		return
 	}
 
 	fmt.Fprintf(response, renderedTemplate)
+}
+
+// @Title hostConfigHandler
+// @Description Renders the host configuration
+// @Param hostname  path  string  true  "Hostname"
+// @Success 200 {object} string "Rendered template"
+// @Failure 400 {object} string "Unable to find host definition for hostname"
+// @Router /config/{hostname} [GET]
+func hostConfigHandler(response http.ResponseWriter, request *http.Request,
+	ps httprouter.Params,
+	config Config) {
+
+	hostname := ps.ByName("hostname")
+
+	m, err := machineDefinition(hostname, config.MachinePath, config)
+	if err != nil {
+		log.Println(err)
+		http.Error(response, "", http.StatusNotFound)
+		return
+	}
+
+	response.Header().Set("content-type", "application/json")
+	result, _ := json.Marshal(m)
+	response.Write(result)
+}
+
+// @Title hostConfigVmHandler
+// @Description Renders the host configuration
+// @Param hostname  path  string  true  "Hostname"
+// @Success 200 {object} string "Config"
+// @Failure 400 {object} string "Unable to find vm definition for hostname"
+// @Router /config/{hostname}/vm [GET]
+func hostConfigVmHandler(response http.ResponseWriter, request *http.Request,
+	ps httprouter.Params,
+	config Config) {
+
+	hostname := ps.ByName("hostname")
+
+	m, err := vmDefinition(hostname, config.VmPath)
+	if err != nil {
+		log.Println(err)
+		http.Error(response, "", http.StatusNotFound)
+		return
+	}
+
+	response.Header().Set("content-type", "application/json")
+	result, _ := json.Marshal(m)
+	response.Write(result)
 }
 
 // @Title buildHandler
@@ -86,14 +154,14 @@ func buildHandler(response http.ResponseWriter, request *http.Request,
 	m, err := machineDefinition(hostname, config.MachinePath, config)
 	if err != nil {
 		log.Println(err)
-		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 500)
+		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), http.StatusNotFound)
 		return
 	}
 
 	token, err := m.setBuildMode(config, state)
 	if err != nil {
 		log.Println(err)
-		http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), 500)
+		http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), http.StatusInternalServerError)
 		return
 	}
 
@@ -209,8 +277,16 @@ func cancelHandler(response http.ResponseWriter, request *http.Request,
 		return
 	}
 
-	result, _ := json.Marshal(&result{State: "OK"})
+	hookType := "post-hook"
+	err = executeHooks(hookType, m, config)
+	if err != nil {
+		log.Println(err)
+		http.Error(response, fmt.Sprintf("Cannot execute post hooks"), 500)
+		return
+	}
 
+	response.Header().Set("content-type", "application/json")
+	result, _ := json.Marshal(&result{State: "OK"})
 	fmt.Fprintf(response, string(result))
 }
 
@@ -243,8 +319,27 @@ func listMachinesHandler(response http.ResponseWriter, request *http.Request,
 		http.Error(response, "Unable to list machines", 500)
 		return
 	}
-	result, _ := json.Marshal(machines)
-	response.Write(result)
+	js, _ := json.Marshal(machines)
+	response.Header().Set("content-type", "application/json")
+	response.Write(js)
+}
+
+// @Title listHooksHandler
+// @Description List all available pre- and post hooks
+// @Success 200 {array} string "List of hooks"
+// @Failure 500 {object} string "Unable to list hooks"
+// @Router /hooks [GET]
+func listHooksHandler(response http.ResponseWriter, request *http.Request,
+	_ httprouter.Params, config Config) {
+	hooks, err := config.listHooks()
+	if err != nil {
+		log.Println(err)
+		http.Error(response, "Unable to list hooks", 500)
+		return
+	}
+	js, _ := json.Marshal(hooks)
+	response.Header().Set("content-type", "application/json")
+	response.Write(js)
 }
 
 // @Title status
@@ -296,6 +391,11 @@ func healthHandler(response http.ResponseWriter, request *http.Request,
 	fmt.Fprintf(response, string(result))
 }
 
+// pxeconfig, _ := m.pixieInit(config)
+// js, _ := json.Marshal(pxeconfig)
+// response.Header().Set("content-type", "application/json")
+// response.Write(js)
+
 func checkForStaleBuilds(state State) {
 
 	staleBuilds := make([]*Machine, 0)
@@ -346,6 +446,10 @@ func main() {
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			listMachinesHandler(response, request, ps, configuration, state)
 		})
+	r.GET("/hooks",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			listHooksHandler(response, request, ps, configuration)
+		})
 	r.PUT("/build/:hostname",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			buildHandler(response, request, ps, configuration, state)
@@ -357,6 +461,14 @@ func main() {
 	r.GET("/status/:hostname",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			hostStatus(response, request, ps, configuration, state)
+		})
+	r.GET("/config/:hostname",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			hostConfigHandler(response, request, ps, configuration)
+		})
+	r.GET("/config/:hostname/vm",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			hostConfigVmHandler(response, request, ps, configuration)
 		})
 	r.GET("/status",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {

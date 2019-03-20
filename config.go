@@ -1,10 +1,11 @@
 package main
 
 import (
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"path"
 	"sync"
+
+	"gopkg.in/yaml.v2"
 )
 
 // Config is our global configuration file
@@ -27,6 +28,8 @@ type Config struct {
 	TemplatePath        string
 	GroupPath           string
 	MachinePath         string
+	VmPath              string
+	HookPath            string
 	StaticFilesPath     string `yaml:"staticspath"`
 	BaseURL             string
 	ForemanProxyAddress string `yaml:"foreman_proxy_address"`
@@ -52,6 +55,9 @@ type Config struct {
 	PreBuildCommands           []BuildCommand `yaml:"prebuild_commands"`
 	PostBuildCommands          []BuildCommand `yaml:"postbuild_commands"`
 	CancelBuildCommands        []BuildCommand `yaml:"cancelbuild_commands"`
+
+	PreHooks  []string `yaml:"pre_hooks"`
+	PostHooks []string `yaml:"post_hooks"`
 }
 
 // Loads config.yaml and returns a Config struct
@@ -100,4 +106,19 @@ func (c Config) listMachines() ([]string, error) {
 	}
 
 	return machines, nil
+}
+
+func (c Config) listHooks() ([]string, error) {
+	var hooks []string
+	files, err := ioutil.ReadDir(c.HookPath)
+	for _, file := range files {
+		name := file.Name()
+		if path.Ext(name) == ".sh" {
+			hooks = append(hooks, name)
+		}
+	}
+	if err != nil {
+		return hooks, err
+	}
+	return hooks, nil
 }

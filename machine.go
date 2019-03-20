@@ -3,9 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/flosch/pongo2"
-	"github.com/satori/go.uuid"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
 	"os"
@@ -14,19 +11,80 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/flosch/pongo2"
+	"github.com/satori/go.uuid"
+	"gopkg.in/yaml.v2"
 )
 
 // Machine configuration
 type Machine struct {
-	Config     `yaml:",inline"`
-	Hostname   string
-	ShortName  string
-	Domain     string
-	Token      string      // This is set by the service
-	Network    []Interface `yaml:"network"`
-	Status     string
-	BuildStart time.Time
-	RescueMode bool
+    Config     `yaml:",inline"`
+    Hostname   string
+    ShortName  string
+    Domain     string
+    Token      string      // This is set by the service
+    Network    []Interface `yaml:"network"`
+    Status     string
+    BuildStart time.Time
+    RescueMode bool
+}
+
+// // Machine configuration
+// type Machine struct {
+// 	OperatingSystem string
+// 	Finish          string
+// 	Preseed         string
+// 	ShortName       string
+// 	Domain          string
+// 	Token           string      // This is set by the service
+// 	Network         []Interface `yaml:"network"`
+// 	Status          string
+// 	BuildStart      time.Time
+// 	RescueMode      bool
+
+// 	Params   map[string]string
+// 	ImageURL string `yaml:"image_url"`
+// 	Kernel   string
+// 	Initrd   string
+// 	Cmdline  string
+// 	Roles    []string
+// 	PubKeys  []string `yaml:"pub_keys"`
+// 	Ipmi     Ipmi
+// }
+
+type Vm struct {
+	Vm []VmInstance
+}
+
+type VmInstance struct {
+	Hostname    string
+	Domain      string
+	Os          string
+	Memory      int
+	Vcpu        int
+	Image       string
+	VirtNetwork string `yaml:"virt_network"`
+	Interfaces  []VmInterface
+	Roles       []string
+	AttachDisks []string `yaml:"attach_disks"`
+	CloudInit   []string `yaml:"cloud_init"`
+}
+
+type VmInterface struct {
+	Name      string
+	IPAddress string
+	Netmask   string
+	Gateway   string
+	Vlan      int
+	Dnsname   string
+}
+
+// IPMI Configuration
+type Ipmi struct {
+	IPAddress  string
+	MacAddress string
+	Md5        string
 }
 
 type IPConfig struct {
@@ -127,10 +185,22 @@ func machineDefinition(hostname string, machinePath string, config Config) (Mach
 	return m, nil
 }
 
-// Render templatewith machine and config struct
+func vmDefinition(hostname string, vmPath string) (Vm, error) {
+	var v Vm
+	data, err := ioutil.ReadFile(path.Join(vmPath, hostname+".yaml"))
+	if err != nil {
+		return Vm{}, err
+	}
+	err = yaml.Unmarshal(data, &v)
+	if err != nil {
+		return Vm{}, err
+	}
+	return v, nil
+}
+
+// Render template among with machine and config struct
 func (m Machine) renderTemplate(template string, config Config) (string, error) {
 
-	template = path.Join(config.TemplatePath, template)
 	if _, err := os.Stat(template); err != nil {
 		return "", errors.New("Template does not exist")
 	}
