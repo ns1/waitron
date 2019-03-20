@@ -391,11 +391,6 @@ func healthHandler(response http.ResponseWriter, request *http.Request,
 	fmt.Fprintf(response, string(result))
 }
 
-// pxeconfig, _ := m.pixieInit(config)
-// js, _ := json.Marshal(pxeconfig)
-// response.Header().Set("content-type", "application/json")
-// response.Write(js)
-
 func checkForStaleBuilds(state State) {
 
 	staleBuilds := make([]*Machine, 0)
@@ -430,7 +425,7 @@ func main() {
 
 	if configFile == "" {
 		if configFile = os.Getenv("CONFIG_FILE"); configFile == "" {
-			log.Fatal("environment variables CONFIG_FILE must be set or use --config")
+			log.Fatal("environment variables CONFIG_FILE must be set or use -config")
 		}
 	}
 

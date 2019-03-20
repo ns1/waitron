@@ -19,15 +19,15 @@ import (
 
 // Machine configuration
 type Machine struct {
-    Config     `yaml:",inline"`
-    Hostname   string
-    ShortName  string
-    Domain     string
-    Token      string      // This is set by the service
-    Network    []Interface `yaml:"network"`
-    Status     string
-    BuildStart time.Time
-    RescueMode bool
+	Config     `yaml:",inline"`
+	Hostname   string
+	ShortName  string
+	Domain     string
+	Token      string      // This is set by the service
+	Network    []Interface `yaml:"network"`
+	Status     string
+	BuildStart time.Time
+	RescueMode bool
 }
 
 // // Machine configuration
@@ -200,9 +200,9 @@ func vmDefinition(hostname string, vmPath string) (Vm, error) {
 
 // Render template among with machine and config struct
 func (m Machine) renderTemplate(template string, config Config) (string, error) {
-
+	template = path.Join(config.TemplatePath, template)
 	if _, err := os.Stat(template); err != nil {
-		return "", errors.New("Template does not exist")
+		return "", fmt.Errorf("template %q does not exist", template)
 	}
 
 	var tpl = pongo2.Must(pongo2.FromFile(template))

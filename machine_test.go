@@ -27,7 +27,7 @@ func TestRenderTemplate(t *testing.T) {
 
 	template, err := m.renderTemplate("finish.j2", config)
 	if err != nil {
-		t.Errorf("failed to render template")
+		t.Errorf("failed to render template: %s", err)
 	}
 
 	expected := "example.com"
@@ -41,7 +41,7 @@ func TestRenderTemplateNotFound(t *testing.T) {
 	m, _ := machineDefinition("dns02.example.com", "machines", Config{})
 	_, err := m.renderTemplate("invalid.j2", config)
 
-	expected := "Template does not exist"
+	expected := "template \"templates/invalid.j2\" does not exist"
 	if err.Error() != expected {
 		t.Errorf(fmt.Sprintf("Expected: %s, got: %s", expected, err.Error()))
 	}
