@@ -23,6 +23,28 @@ type result struct {
 	State string `json:",omitempty"`
 }
 
+// @Title definitionHandler
+// @Description Return the waitron configuration details for a machine
+// @Param hostname    path    string    true    "Hostname"
+// @Success 200    {object} string "Machine config in JSON format."
+// @Failure 404    {object} string "Machine not found"
+// @Router /definition/{hostname} [GET]
+func definitionHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, config Config, state State) {
+
+	hostname := ps.ByName("hostname")
+
+	m, err := machineDefinition(hostname, config.MachinePath, config)
+	if err != nil {
+		log.Println(err)
+		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 404)
+		return
+	}
+
+	result, _ := json.Marshal(m)
+
+	fmt.Fprintf(response, string(result))
+}
+
 // @Title templateHandler
 // @Description Render either the finish or the preseed template
 // @Param hostname    path    string    true    "Hostname"
@@ -361,6 +383,10 @@ func main() {
 	r.GET("/status",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			status(response, request, ps, configuration, state)
+		})
+	r.GET("/definition/:hostname",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			definitionHandler(response, request, ps, configuration, state)
 		})
 	r.GET("/done/:hostname/:token",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
