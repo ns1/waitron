@@ -1,7 +1,7 @@
 module github.com/ns1/waitron
 
 require (
-	github.com/flosch/pongo2 v0.0.0-20181225140029-79872a7b2769
+	github.com/flosch/pongo2 v0.0.0-20181225140029-8b9568efa76d
 	github.com/gorilla/handlers v1.4.0
 	github.com/julienschmidt/httprouter v1.2.0
 	github.com/satori/go.uuid v1.2.0
