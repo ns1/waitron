@@ -1,4 +1,6 @@
 # waitron
+> This project is in [maintenance](https://github.com/ns1/community/blob/master/project_status/MAINTENANCE.md) status.
+
 [![Build Status](https://travis-ci.org/jhaals/waitron.svg?branch=master)](https://travis-ci.org/jhaals/waitron)
 
 Waitron reads the machine definition from YAML and templates preseed and finish scripts based on that data. When a server is set in _build mode_ waitron will deliver a kernel/initrd/commandline used by [pixiecore](https://github.com/danderson/pixiecore) (in API mode) to boot and install the machine.
@@ -31,3 +33,7 @@ params.dns_servers | string containing the dns servers to be configured in the i
 ### API
 
 See [API.md](API.md) file in the repo
+
+Contributions
+---
+Pull Requests and issues are welcome. See the [NS1 Contribution Guidelines](https://github.com/ns1/community) for more information.
