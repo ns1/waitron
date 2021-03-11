@@ -8,19 +8,24 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/gorilla/handlers"
-	"github.com/julienschmidt/httprouter"
 	"log"
 	"net/http"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/gorilla/handlers"
+	"github.com/julienschmidt/httprouter"
 )
 
 type result struct {
 	Token string `json:",omitempty"`
 	Error string `json:",omitempty"`
 	State string `json:",omitempty"`
+}
+
+func normalizeMAC(s string) string {
+	return s
 }
 
 // @Title definitionHandler
@@ -292,7 +297,7 @@ func pixieHandler(response http.ResponseWriter, request *http.Request,
 	macaddr := ps.ByName("macaddr")
 
 	state.Mux.Lock()
-	m, found := state.MachineByMAC[macaddr]
+	m, found := state.MachineByMAC[normalizeMAC(macaddr)]
 	state.Mux.Unlock()
 
 	if found == false {
@@ -324,7 +329,7 @@ func checkForStaleBuilds(state State) {
 
 	state.Mux.Lock()
 
-	for _, m := range state.MachineByMAC {
+	for _, m := range state.MachineByHostname {
 		if int(time.Now().Sub(m.BuildStart).Seconds()) >= m.StaleBuildThresholdSeconds {
 			staleBuilds = append(staleBuilds, m)
 		}

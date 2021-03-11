@@ -3,9 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/flosch/pongo2"
-	"github.com/satori/go.uuid"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
 	"os"
@@ -14,6 +11,10 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/flosch/pongo2"
+	uuid "github.com/satori/go.uuid"
+	"gopkg.in/yaml.v2"
 )
 
 // Machine configuration
@@ -124,6 +125,13 @@ func machineDefinition(hostname string, machinePath string, config Config) (Mach
 		return Machine{}, err
 	}
 
+	// Then normalize interface MAC addresses
+	r := strings.NewReplacer(":", "", "-", "", ".", "")
+
+	for i := 0; i < len(m.Network); i++ {
+		m.Network[i].MacAddress = strings.ToLower(r.Replace(m.Network[i].MacAddress))
+	}
+
 	return m, nil
 }
 
@@ -167,8 +175,12 @@ func (m Machine) setBuildMode(config Config, state State) (string, error) {
 
 	//Add to the Machine* tables
 	state.MachineByUUID[uuid.String()] = &m
-	state.MachineByMAC[fmt.Sprintf("%s", m.Network[0].MacAddress)] = &m
 	state.MachineByHostname[m.Hostname] = &m
+
+	for _, i := range m.Network {
+		state.MachineByMAC[i.MacAddress] = &m
+	}
+
 	m.BuildStart = time.Now()
 	//Change machine state
 	m.Status = "Installing"
@@ -188,8 +200,10 @@ func (m Machine) doneBuildMode(config Config, state State) error {
 	state.Mux.Lock()
 	//Delete mac from the building map
 	delete(state.MachineByHostname, fmt.Sprintf("%s", m.Hostname))
-	delete(state.MachineByMAC, fmt.Sprintf("%s", m.Network[0].MacAddress))
 	delete(state.MachineByUUID, m.Token)
+	for _, i := range m.Network {
+		delete(state.MachineByMAC, i.MacAddress)
+	}
 
 	//Change machine state
 	m.Status = "Installed"
@@ -211,8 +225,10 @@ func (m Machine) cancelBuildMode(config Config, state State) error {
 	state.Mux.Lock()
 	//Delete mac from the building map
 	delete(state.MachineByHostname, fmt.Sprintf("%s", m.Hostname))
-	delete(state.MachineByMAC, fmt.Sprintf("%s", m.Network[0].MacAddress))
 	delete(state.MachineByUUID, m.Token)
+	for _, i := range m.Network {
+		delete(state.MachineByMAC, i.MacAddress)
+	}
 
 	//Change machine state
 	m.Status = "Terminated"
