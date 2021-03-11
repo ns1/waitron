@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,10 +23,6 @@ type result struct {
 	Token string `json:",omitempty"`
 	Error string `json:",omitempty"`
 	State string `json:",omitempty"`
-}
-
-func normalizeMAC(s string) string {
-	return s
 }
 
 // @Title definitionHandler
@@ -297,7 +294,10 @@ func pixieHandler(response http.ResponseWriter, request *http.Request,
 	macaddr := ps.ByName("macaddr")
 
 	state.Mux.Lock()
-	m, found := state.MachineByMAC[normalizeMAC(macaddr)]
+
+	r := strings.NewReplacer(":", "", "-", "", ".", "")
+
+	m, found := state.MachineByMAC[strings.ToLower(r.Replace(macaddr))]
 	state.Mux.Unlock()
 
 	if found == false {
