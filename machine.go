@@ -174,6 +174,8 @@ func (m Machine) setBuildMode(config Config, state State) (string, error) {
 	m.Token = state.Tokens[m.Hostname]
 
 	//Add to the Machine* tables
+	// Looks like there's a bit of a leak here if you "build" the same machine again before a build completes.
+	// Without a cancel or completion, the uuid doesn't get cleaned up.
 	state.MachineByUUID[uuid.String()] = &m
 	state.MachineByHostname[m.Hostname] = &m
 
