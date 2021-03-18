@@ -58,6 +58,7 @@ func (p *FileInventoryPlugin) GetMachine(hostname string, macaddress string) (*m
 		Domain:    strings.Join(hostSlice[1:], "."),
 	}
 
+	// Move the path settings and checks to Init so we can blow up early.
 	if groupPath, ok := p.settings.AdditionalOptions["grouppath"].(string); ok {
 		// Then, load the domain definition.
 		data, err := ioutil.ReadFile(path.Join(groupPath, m.Domain+".yaml")) // apc03.prod.yaml

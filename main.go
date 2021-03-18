@@ -242,6 +242,9 @@ func main() {
 	}
 
 	w := waitron.New(configuration)
+	if err := w.Init(); err != nil {
+		log.Fatal(err)
+	}
 
 	r := httprouter.New()
 	r.GET("/list",

@@ -7,10 +7,10 @@ import (
 // Machine configuration
 type Machine struct {
 	config.Config `yaml:",inline"`
-	Hostname      string
-	ShortName     string
-	Domain        string
-	Network       []Interface `yaml:"network"`
+	Hostname      string      `yaml:"hostname,omitempty"`
+	ShortName     string      `yaml:"shortname,omitempty"`
+	Domain        string      `yaml:"domain,omitempty"`
+	Network       []Interface `yaml:"network,omitempty"`
 	BuildTypeName string      `yaml:"build_type,omitempty"`
 }
 

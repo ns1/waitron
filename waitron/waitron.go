@@ -62,7 +62,7 @@ type Waitron struct {
 	done chan struct{}
 	wg   sync.WaitGroup
 
-	activePlugins map[string]inventoryplugins.MachineInventoryPlugin
+	activePlugins []inventoryplugins.MachineInventoryPlugin
 }
 
 func FilterGetValueByKey(in *pongo2.Value, param *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
@@ -83,11 +83,12 @@ func init() {
 
 func New(c config.Config) *Waitron {
 	w := &Waitron{
-		config:  c,
-		jobs:    Jobs{},
-		history: JobsHistory{},
-		done:    make(chan struct{}, 1),
-		wg:      sync.WaitGroup{},
+		config:        c,
+		jobs:          Jobs{},
+		history:       JobsHistory{},
+		done:          make(chan struct{}, 1),
+		wg:            sync.WaitGroup{},
+		activePlugins: make([]inventoryplugins.MachineInventoryPlugin, 0, 1),
 	}
 
 	w.history.jobByToken = make(map[string]*Job)
@@ -113,17 +114,21 @@ func (w *Waitron) initPlugins() error {
 				return err
 			}
 
-			w.activePlugins[cp.Name] = p
+			w.activePlugins = append(w.activePlugins, p)
 		}
 	}
 	return nil
 }
 
-func (w *Waitron) Run() error {
-
+func (w *Waitron) Init() error {
 	if err := w.initPlugins(); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func (w *Waitron) Run() error {
 
 	if w.config.StaleBuildCheckFrequency <= 0 {
 		w.config.StaleBuildCheckFrequency = 300
@@ -202,7 +207,7 @@ func (w *Waitron) runBuildCommands(j *Job, b []config.BuildCommand) error {
 		}
 
 		j.RLock()
-		cmdline, err := tpl.Execute(pongo2.Context{"machine": j.Machine, "Token": j.Token})
+		cmdline, err := tpl.Execute(pongo2.Context{"job": j, "machine": j.Machine, "token": j.Token})
 		j.RUnlock()
 
 		if buildCommand.ShouldLog {
@@ -227,26 +232,17 @@ func (w *Waitron) runBuildCommands(j *Job, b []config.BuildCommand) error {
 // buildType can be normal, rescue, etc.
 // Waitron can load a table from config of build_types with separate definitions, which can include whether "stale" make sense, so we can stop stale alerts for rescued machines.
 func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
-	// Since the details of a BuildType can also exist directly in the root config,
-	// An empty buildtype can be assumed to mean we'll use that.
-	// But, it's important to remember that things will be merged, and using the root config as a "default"
-	// Might give you more items in pre/post/stale/cancel command lists than expected.
-	// Build type will be passed in
-	// Build type is how we will know what specific pre-build commands exist
-	// Groups and Machines can also have specific pre-build commands, but this should all be handled by how we merge in the configs starting at config->group->machine
-	// We can also allow build-type to come from the config of the machine itself.
-	// If present, we should be merging on top of that build type and not the one passed in herethen have to "rebase" the machine onto the build type it's requesting.
-	// If not present, then it will be set from buildType - This must happen so that when the macaddress comes in for the pxe config, we will know what to serve.
 	/*
-		Check for the existence of build type in the compiled machine details.
-		Take the global config and create a Machine from that.
-		Take the build type and merge on top of that
-		Merge the previous, compiled Machine object into that so that Machine-specific config takes precedence over the global and build-type config.
-		Generate a job UUID
-		Create a *Job using the UUID, the final *machine.Machine, and the *BuildType
-		Add that job to w.jobs - I'll have hostname, token, and uuid.
-		Take all MacAddress found in *machine.Machine->Network and register them all in JobByMac.
-
+		Since the details of a BuildType can also exist directly in the root config,
+		An empty buildtype can be assumed to mean we'll use that.
+		But, it's important to remember that things will be merged, and using the root config as a "default"
+		Might give you more items in pre/post/stale/cancel command lists than expected.
+		Build type will be passed in
+		Build type is how we will know what specific pre-build commands exist
+		Groups and Machines can also have specific pre-build commands, but this should all be handled by how we merge in the configs starting at config->group->machine
+		We can also allow build-type to come from the config of the machine itself.
+		If present, we should be merging on top of that build type and not the one passed in herethen have to "rebase" the machine onto the build type it's requesting.
+		If not present, then it will be set from buildType - This must happen so that when the macaddress comes in for the pxe config, we will know what to serve.
 	*/
 
 	// Generate a job token, which can optionally be used to authenticate requests.
@@ -258,6 +254,7 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 
 	baseMachine := &machine.Machine{}
 
+	// Get the compile machine details from any plugins being used
 	foundMachine, err := w.GetMergedMachine(hostname)
 
 	// Merge in the "global" config.  The marshal/unmarshal combo looks funny, but it's clean and we aren't shooting for warp speed here.
@@ -297,6 +294,7 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 		return "", err
 	}
 
+	// Prep the new Job
 	j := &Job{
 		Start:        time.Now(),
 		RWMutex:      sync.RWMutex{},
@@ -324,19 +322,37 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 	return token, nil
 }
 
+/*
+This produces a Machine with data compiled from all enabled plugins.
+This is not pulling data from Waitron.  It's pulling external data,
+compiling it, and returning that.
+*/
 func (w *Waitron) GetMergedMachine(hostname string) (*machine.Machine, error) {
 	/*
-			Take the hostname and start looping through the inventory plugins
-			Merge details as you get them into a single, compiled Machine object
+		Take the hostname and start looping through the inventory plugins
+		Merge details as you get them into a single, compiled Machine object
+	*/
 
+	m := &machine.Machine{}
 
-		m := &machine.Machine{}
+	for _, p := range w.activePlugins {
+		pm, err := p.GetMachine(hostname, "")
 
-		for _, i := range w.config.MachineInventoryPlugins {
+		if err != nil {
+			return m, err
+		}
 
-		}*/
+		// Just keep merging in details that we find
+		if b, err := yaml.Marshal(pm); err == nil {
+			if err = yaml.Unmarshal(b, m); err != nil {
+				return m, err
+			}
+		} else {
+			return m, err
+		}
+	}
 
-	return nil, nil
+	return m, nil
 }
 
 func (w *Waitron) GetMachineStatus(hostname string) (string, error) {
@@ -571,7 +587,7 @@ func (w *Waitron) GetJobsHistoryBlob() ([]byte, error) {
 
 //  Can be used to query for one or more machines.
 func (w *Waitron) GetMachines(hostnames []string, macs []string) ([]*machine.Machine, error) {
-	ms := make([]*machine.Machine, 1, 10)
+	ms := make([]*machine.Machine, 0, 10)
 	// Loop through inventory plugins and query by hostnames and macs (really only one should be set).
 	// Compile a list of found machines
 	// Empty hostnames and empty macs list means get all
@@ -606,7 +622,7 @@ func (w *Waitron) renderTemplate(templateName string, j *Job) (string, error) {
 	}
 
 	var tpl = pongo2.Must(pongo2.FromFile(templateName))
-	result, err := tpl.Execute(pongo2.Context{"machine": j.Machine, "config": w.config})
+	result, err := tpl.Execute(pongo2.Context{"job": j, "machine": j.Machine, "config": w.config})
 	if err != nil {
 		return "", err
 	}
