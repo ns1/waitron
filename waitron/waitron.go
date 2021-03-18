@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"waitron/config"
-	"waitron/inventory_plugins"
+	"waitron/inventoryplugins"
 	"waitron/machine"
 
 	"github.com/flosch/pongo2"
@@ -62,7 +62,7 @@ type Waitron struct {
 	done chan struct{}
 	wg   sync.WaitGroup
 
-	activePlugins map[string]inventory_plugins.MachineInventoryPlugin
+	activePlugins map[string]inventoryplugins.MachineInventoryPlugin
 }
 
 func FilterGetValueByKey(in *pongo2.Value, param *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
@@ -103,7 +103,7 @@ func (w *Waitron) initPlugins() error {
 	for _, cp := range w.config.MachineInventoryPlugins {
 		if cp.Enabled {
 
-			p, err := inventory_plugins.GetPlugin(cp.Name, &cp, &w.config)
+			p, err := inventoryplugins.GetPlugin(cp.Name, &cp, &w.config)
 
 			if err != nil {
 				return err
