@@ -31,13 +31,15 @@ type BuildType struct {
 }
 
 type MachineInventoryPluginSettings struct {
-	Name             string                 `yaml:"name"`
-	Type             string                 `yaml:"type"`
-	Source           string                 `yaml:"source"`
-	AuthUser         string                 `yaml:"auth_username"`
-	AuthPassword     string                 `yaml:"auth_password"`
-	AuthToken        string                 `yaml:"auth_token"`
-	AdditionalOption map[string]interface{} `yaml:"additional_options"`
+	Name              string                 `yaml:"name"`
+	Type              string                 `yaml:"type"`
+	Source            string                 `yaml:"source"`
+	AuthUser          string                 `yaml:"auth_user,omitempty"`
+	AuthPassword      string                 `yaml:"auth_password,omitempty"`
+	AuthToken         string                 `yaml:"auth_token,omitempty"`
+	AdditionalOptions map[string]interface{} `yaml:"additional_options,omitempty"`
+	ReadOnly          bool                   `yaml:"read_only", default:"true"`
+	Enabled           bool                   `yaml:"enabled", default:"true"`
 }
 
 // Config is our global configuration file

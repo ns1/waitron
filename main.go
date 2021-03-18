@@ -36,7 +36,7 @@ func definitionHandler(response http.ResponseWriter, request *http.Request, ps h
 
 	hostname := ps.ByName("hostname")
 
-	m, err := w.GetMachines([]string{hostname})
+	m, err := w.GetMachines([]string{hostname}, []string{})
 	if err != nil {
 		log.Println(err)
 		http.Error(response, fmt.Sprintf("Unable to find host definition for %s. %s", hostname, err.Error()), 404)
@@ -166,7 +166,7 @@ func hostStatus(response http.ResponseWriter, request *http.Request, ps httprout
 // @Failure 500    {object} string "Unable to list machines"
 // @Router /list [GET]
 func listMachinesHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
-	machines, err := w.GetMachines([]string{})
+	machines, err := w.GetMachines([]string{}, []string{})
 
 	if err != nil {
 		log.Println(err)
@@ -292,7 +292,7 @@ func main() {
 	}
 
 	if err := w.Run(); err != nil {
-		log.Fatal("waitron instance failed to run: %w", err)
+		log.Fatal("waitron instance failed to run: %v", err)
 	}
 
 	log.Println("Starting Server on " + *address + ":" + *port)
