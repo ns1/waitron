@@ -38,7 +38,7 @@ type Jobs struct {
 
 type JobsHistory struct {
 	sync.RWMutex `json:"-"`
-	jobByToken   map[string]*Job // By Token
+	jobByToken   map[string]*Job
 }
 
 type Job struct {
@@ -49,9 +49,9 @@ type Job struct {
 	Status       string
 	StatusReason string
 
-	Type    *config.BuildType
-	Machine *machine.Machine
-	Token   string // This is set by the service
+	BuildTypeName string
+	Machine       *machine.Machine
+	Token         string
 }
 
 type Waitron struct {
@@ -248,14 +248,14 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 	// Generate a job token, which can optionally be used to authenticate requests.
 	token := uuid.New().String()
 
-	log.Println(fmt.Sprintf("%s job token: %s", hostname, token))
+	log.Println(fmt.Sprintf("%s job token generated: %s", hostname, token))
 
 	hostname = strings.ToLower(hostname)
 
 	baseMachine := &machine.Machine{}
 
 	// Get the compile machine details from any plugins being used
-	foundMachine, err := w.GetMergedMachine(hostname)
+	foundMachine, err := w.GetMergedMachine(hostname, "")
 
 	// Merge in the "global" config.  The marshal/unmarshal combo looks funny, but it's clean and we aren't shooting for warp speed here.
 	if c, err := yaml.Marshal(w.config); err == nil {
@@ -266,13 +266,19 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 		return "", err
 	}
 
-	// Merge in the build type, but allow machines to select their own build type.
+	// Merge in the build type, but allow machines to select their own build type first.
 	if foundMachine.BuildTypeName != "" {
 		buildTypeName = foundMachine.BuildTypeName
 	}
 
 	if buildTypeName != "" {
-		if b, err := yaml.Marshal(w.config.BuildTypes[buildTypeName]); err == nil {
+		buildType, found := w.config.BuildTypes[buildTypeName]
+
+		if !found {
+			return "", fmt.Errorf("build type '%s' not found", buildTypeName)
+		}
+
+		if b, err := yaml.Marshal(buildType); err == nil {
 			if err = yaml.Unmarshal(b, baseMachine); err != nil {
 				return "", err
 			}
@@ -280,6 +286,8 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 			return "", err
 		}
 	}
+
+	log.Print(fmt.Sprintf("MACHINE %s: %v", token, baseMachine))
 
 	// Finally, merge in the machine-specific details.
 	if f, err := yaml.Marshal(foundMachine); err == nil {
@@ -296,12 +304,13 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 
 	// Prep the new Job
 	j := &Job{
-		Start:        time.Now(),
-		RWMutex:      sync.RWMutex{},
-		Status:       "pending",
-		StatusReason: "",
-		Machine:      baseMachine,
-		Token:        token,
+		Start:         time.Now(),
+		RWMutex:       sync.RWMutex{},
+		Status:        "pending",
+		StatusReason:  "",
+		Machine:       baseMachine,
+		BuildTypeName: buildTypeName,
+		Token:         token,
 	}
 
 	// Perform any desired operations needed prior to setting build mode.
@@ -317,7 +326,10 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 		macs = append(macs, strings.ToLower(r.Replace(j.Machine.Network[i].MacAddress)))
 	}
 
-	err = w.addJob(j, token, hostname, macs)
+	log.Println(fmt.Sprintf("job %s added", token))
+	if err = w.addJob(j, token, hostname, macs); err != nil {
+		return "", err
+	}
 
 	return token, nil
 }
@@ -327,7 +339,7 @@ This produces a Machine with data compiled from all enabled plugins.
 This is not pulling data from Waitron.  It's pulling external data,
 compiling it, and returning that.
 */
-func (w *Waitron) GetMergedMachine(hostname string) (*machine.Machine, error) {
+func (w *Waitron) GetMergedMachine(hostname string, mac string) (*machine.Machine, error) {
 	/*
 		Take the hostname and start looping through the inventory plugins
 		Merge details as you get them into a single, compiled Machine object
@@ -336,7 +348,7 @@ func (w *Waitron) GetMergedMachine(hostname string) (*machine.Machine, error) {
 	m := &machine.Machine{}
 
 	for _, p := range w.activePlugins {
-		pm, err := p.GetMachine(hostname, "")
+		pm, err := p.GetMachine(hostname, mac)
 
 		if err != nil {
 			return m, err
@@ -356,7 +368,19 @@ func (w *Waitron) GetMergedMachine(hostname string) (*machine.Machine, error) {
 }
 
 func (w *Waitron) GetMachineStatus(hostname string) (string, error) {
-	j, err := w.getJob(hostname, "")
+	j, err := w.getActiveJob(hostname, "")
+	if err != nil {
+		return "unknown", err
+	}
+
+	j.RLock()
+	defer j.RUnlock()
+
+	return j.Status, nil
+}
+
+func (w *Waitron) GetActiveJobStatus(token string) (string, error) {
+	j, err := w.getActiveJob("", token)
 	if err != nil {
 		return "unknown", err
 	}
@@ -368,9 +392,13 @@ func (w *Waitron) GetMachineStatus(hostname string) (string, error) {
 }
 
 func (w *Waitron) GetJobStatus(token string) (string, error) {
-	j, err := w.getJob(token, "")
-	if err != nil {
-		return "unknown", err
+	w.history.RLock()
+	defer w.history.RUnlock()
+
+	j, found := w.history.jobByToken[token]
+
+	if !found {
+		return "unknown", fmt.Errorf("job '%s' not found", token)
 	}
 
 	j.RLock()
@@ -387,13 +415,17 @@ func (w *Waitron) addJob(j *Job, token string, hostname string, macs []string) e
 	w.jobs.jobByHostname[hostname] = j
 
 	for _, mac := range macs {
-		w.jobs.jobByHostname[mac] = j
+		w.jobs.jobByMAC[mac] = j
 	}
+
+	w.history.Lock()
+	w.history.jobByToken[token] = j
+	w.history.Unlock()
 
 	return nil
 }
 
-func (w *Waitron) getJob(hostname string, token string) (*Job, error) {
+func (w *Waitron) getActiveJob(hostname string, token string) (*Job, error) {
 	w.jobs.RLock()
 	defer w.jobs.RUnlock()
 
@@ -427,9 +459,11 @@ func (w *Waitron) getJob(hostname string, token string) (*Job, error) {
 
 func (w *Waitron) GetPxeConfig(macaddress string) (PixieConfig, error) {
 
-	// Look up the *Job by MAC
-	// Build the pxe config based on the compiled machine details.
+	// Normalize the MAC
+	r := strings.NewReplacer(":", "", "-", "", ".", "")
+	macaddress = strings.ToLower(r.Replace(macaddress))
 
+	// Look up the *Job by MAC
 	w.jobs.RLock()
 	j, found := w.jobs.jobByMAC[macaddress]
 	w.jobs.RUnlock()
@@ -437,6 +471,8 @@ func (w *Waitron) GetPxeConfig(macaddress string) (PixieConfig, error) {
 	if !found {
 		return PixieConfig{}, fmt.Errorf("job not found for  '%s'", macaddress)
 	}
+
+	// Build the pxe config based on the compiled machine details.
 
 	pixieConfig := PixieConfig{}
 
@@ -455,20 +491,26 @@ func (w *Waitron) GetPxeConfig(macaddress string) (PixieConfig, error) {
 	}
 
 	cmdline, err = tpl.Execute(pongo2.Context{"machine": j.Machine, "BaseURL": j.Machine.BaseURL, "Hostname": j.Machine.Hostname, "Token": j.Token})
-	if err != nil {
-		j.RUnlock()
-		j.Lock()
-		j.Status = "failed"
-		j.StatusReason = "pxe config build failed"
-		j.Unlock()
-		return pixieConfig, err
-	}
 
 	j.RUnlock()
+	j.Lock()
+	defer j.Unlock()
 
-	pixieConfig.Kernel = imageURL + kernel
-	pixieConfig.Initrd = []string{imageURL + initrd}
+	if err != nil {
+		j.Status = "failed"
+		j.StatusReason = "pxe config build failed"
+		return pixieConfig, err
+	} else {
+		j.Status = "installing"
+		j.StatusReason = "pxe config sent"
+	}
+
+	imageURL = strings.TrimRight(imageURL, "/")
+
+	pixieConfig.Kernel = imageURL + "/" + kernel
+	pixieConfig.Initrd = []string{imageURL + "/" + initrd}
 	pixieConfig.Cmdline = cmdline
+
 	return pixieConfig, nil
 }
 
@@ -499,7 +541,7 @@ func (w *Waitron) cleanUpJob(j *Job, status string) error {
 
 func (w *Waitron) FinishBuild(hostname string, token string) error {
 
-	j, err := w.getJob(hostname, token)
+	j, err := w.getActiveJob(hostname, token)
 
 	if err != nil {
 		return err
@@ -515,7 +557,7 @@ func (w *Waitron) FinishBuild(hostname string, token string) error {
 
 func (w *Waitron) CancelBuild(hostname string, token string) error {
 
-	j, err := w.getJob(hostname, token)
+	j, err := w.getActiveJob(hostname, token)
 
 	if err != nil {
 		return err
@@ -530,7 +572,7 @@ func (w *Waitron) CancelBuild(hostname string, token string) error {
 }
 
 func (w *Waitron) CleanHistory() error {
-	// Loop through all items in JobsHistory and check existence in JobByToken
+	// Loop through all items in JobsHistory and check existence in Waitron.jobs.JobByToken
 	// If not found, it's either completed or terminated and can be cleaned out.
 	w.history.Lock()
 	defer w.history.Unlock()
@@ -585,18 +627,30 @@ func (w *Waitron) GetJobsHistoryBlob() ([]byte, error) {
 	return blob, nil
 }
 
-//  Can be used to query for one or more machines.
-func (w *Waitron) GetMachines(hostnames []string, macs []string) ([]*machine.Machine, error) {
-	ms := make([]*machine.Machine, 0, 10)
-	// Loop through inventory plugins and query by hostnames and macs (really only one should be set).
-	// Compile a list of found machines
-	// Empty hostnames and empty macs list means get all
-	return ms, nil
+func (w *Waitron) GetJobBlob(token string) ([]byte, error) {
+
+	w.history.RLock()
+	j, found := w.history.jobByToken[token]
+	w.history.RUnlock()
+
+	if !found {
+		return []byte{}, fmt.Errorf("job '%s' not found", token)
+	}
+
+	j.RLock()
+	b, err := json.Marshal(j)
+	j.RUnlock()
+
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return b, nil
 }
 
 func (w *Waitron) RenderStageTemplate(token string, template string) (string, error) {
 
-	j, err := w.getJob(token, "")
+	j, err := w.getActiveJob("", token)
 	if err != nil {
 		return "unknown", err
 	}
@@ -622,7 +676,7 @@ func (w *Waitron) renderTemplate(templateName string, j *Job) (string, error) {
 	}
 
 	var tpl = pongo2.Must(pongo2.FromFile(templateName))
-	result, err := tpl.Execute(pongo2.Context{"job": j, "machine": j.Machine, "config": w.config})
+	result, err := tpl.Execute(pongo2.Context{"job": j, "machine": j.Machine, "config": w.config, "Token": j.Token})
 	if err != nil {
 		return "", err
 	}

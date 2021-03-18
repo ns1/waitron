@@ -14,45 +14,45 @@ type BuildCommand struct {
 }
 
 type BuildType struct {
-	Cmdline  string `yaml:"cmdline"`
-	Kernel   string `yaml:"kernel"`
-	Initrd   string `yaml:"initrd"`
-	ImageURL string `yaml:"image_url"`
+	Cmdline  string `yaml:"cmdline,omitempty"`
+	Kernel   string `yaml:"kernel,omitempty"`
+	Initrd   string `yaml:"initrd,omitempty"`
+	ImageURL string `yaml:"image_url,omitempty"`
 
-	OperatingSystem string
-	Finish          string
-	Preseed         string
+	OperatingSystem string `yaml:"operatingsystem,omitempty"`
+	Finish          string `yaml:"finish,omitempty"`
+	Preseed         string `yaml:"preseed,omitempty"`
 	Params          map[string]string
 
-	StaleBuildCommands  []BuildCommand `yaml:"stalebuild_commands"`
-	PreBuildCommands    []BuildCommand `yaml:"prebuild_commands"`
-	PostBuildCommands   []BuildCommand `yaml:"postbuild_commands"`
-	CancelBuildCommands []BuildCommand `yaml:"cancelbuild_commands"`
+	StaleBuildCommands  []BuildCommand `yaml:"stalebuild_commands,omitempty"`
+	PreBuildCommands    []BuildCommand `yaml:"prebuild_commands,omitempty"`
+	PostBuildCommands   []BuildCommand `yaml:"postbuild_commands,omitempty"`
+	CancelBuildCommands []BuildCommand `yaml:"cancelbuild_commands,omitempty"`
 }
 
 type MachineInventoryPluginSettings struct {
 	Name              string                 `yaml:"name"`
 	Type              string                 `yaml:"type"`
 	Source            string                 `yaml:"source"`
-	AuthUser          string                 `yaml:"auth_user,omitempty"`
-	AuthPassword      string                 `yaml:"auth_password,omitempty"`
-	AuthToken         string                 `yaml:"auth_token,omitempty"`
-	AdditionalOptions map[string]interface{} `yaml:"additional_options,omitempty"`
+	AuthUser          string                 `yaml:"auth_user"`
+	AuthPassword      string                 `yaml:"auth_password"`
+	AuthToken         string                 `yaml:"auth_token"`
+	AdditionalOptions map[string]interface{} `yaml:"additional_options"`
 	ReadOnly          bool                   `yaml:"read_only", default:"true"`
 	Enabled           bool                   `yaml:"enabled", default:"true"`
 }
 
 // Config is our global configuration file
 type Config struct {
-	TemplatePath    string
-	GroupPath       string
-	StaticFilesPath string `yaml:"staticspath"`
-	BaseURL         string
+	TemplatePath    string `yaml:"templatepath,omitempty"`
+	GroupPath       string `yaml:"grouppath,omitempty"`
+	StaticFilesPath string `yaml:"staticspath,omitempty"`
+	BaseURL         string `yaml:"baseurl,omitempty"`
 
 	MachineInventoryPlugins    []MachineInventoryPluginSettings `yaml:"inventory_plugins,omitempty"`
 	BuildTypes                 map[string]BuildType             `yaml:"build_types,omitempty"`
-	StaleBuildCheckFrequency   int                              `yaml:"stale_build_check_frequency_secs"`
-	StaleBuildThresholdSeconds int                              `yaml:"stale_build_threshold_secs"`
+	StaleBuildCheckFrequency   int                              `yaml:"stale_build_check_frequency_secs,omitempty"`
+	StaleBuildThresholdSeconds int                              `yaml:"stale_build_threshold_secs,omitempty"`
 
 	BuildType `yaml:",inline"`
 }

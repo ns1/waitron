@@ -11,9 +11,8 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 
-	config "waitron/config"
+	"waitron/config"
 	"waitron/waitron"
 
 	"github.com/gorilla/handlers"
@@ -36,7 +35,7 @@ func definitionHandler(response http.ResponseWriter, request *http.Request, ps h
 
 	hostname := ps.ByName("hostname")
 
-	m, err := w.GetMachines([]string{hostname}, []string{})
+	m, err := w.GetMergedMachine(hostname, "")
 	if err != nil {
 		log.Println(err)
 		http.Error(response, fmt.Sprintf("Unable to find host definition for %s. %s", hostname, err.Error()), 404)
@@ -46,6 +45,26 @@ func definitionHandler(response http.ResponseWriter, request *http.Request, ps h
 	result, _ := json.Marshal(m)
 
 	fmt.Fprintf(response, string(result))
+}
+
+// @Title jobDefinitionHandler
+// @Description Return details for the specified job token
+// @Param token    path    string    true    "Token"
+// @Success 200    {object} string "Job details in JSON format."
+// @Failure 404    {object} string "Job not found"
+// @Router /job/{token} [GET]
+func jobDefinitionHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
+
+	token := ps.ByName("token")
+
+	jb, err := w.GetJobBlob(token)
+	if err != nil {
+		log.Println(err)
+		http.Error(response, fmt.Sprintf("Unable to find valid job for %s. %s", token, err.Error()), 404)
+		return
+	}
+
+	response.Write(jb)
 }
 
 // @Title templateHandler
@@ -131,7 +150,7 @@ func doneHandler(response http.ResponseWriter, request *http.Request, ps httprou
 // @Router /cancel/{hostname}/{token} [GET]
 func cancelHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
-	err := w.FinishBuild(ps.ByName("hostname"), ps.ByName("token"))
+	err := w.CancelBuild(ps.ByName("hostname"), ps.ByName("token"))
 
 	if err != nil {
 		log.Println(err)
@@ -160,30 +179,28 @@ func hostStatus(response http.ResponseWriter, request *http.Request, ps httprout
 	fmt.Fprintf(response, s)
 }
 
-// @Title listMachinesHandler
-// @Description List machines handled by waitron
-// @Success 200    {array} string "List of machines"
-// @Failure 500    {object} string "Unable to list machines"
-// @Router /list [GET]
-func listMachinesHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
-	machines, err := w.GetMachines([]string{}, []string{})
-
-	if err != nil {
-		log.Println(err)
-		http.Error(response, "Unable to list machines", 500)
-		return
-	}
-
-	result, _ := json.Marshal(machines)
-	response.Write(result)
-}
-
 // @Title status
 // @Description Dictionary with machines and its status
 // @Success 200    {object} string "Dictionary with machines and its status"
 // @Router /status [GET]
 func status(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 	result, _ := w.GetJobsHistoryBlob()
+	response.Write(result)
+}
+
+// @Title cleanHistory
+// @Description Clear all completed jobs from the in-memory history of Waitron
+// @Success 200    {object} string "{"State": "OK"}"
+// @Failure 500    {object} string "Failed to clean history"
+// @Router /cleanhistory [GET]
+func cleanHistory(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
+	err := w.CleanHistory()
+	if err != nil {
+		http.Error(response, "Failed to clean history", 500)
+		return
+	}
+	result, _ := json.Marshal(&result{State: "OK"})
+
 	response.Write(result)
 }
 
@@ -196,9 +213,7 @@ func status(response http.ResponseWriter, request *http.Request, ps httprouter.P
 // @Router /v1/boot/{macaddr} [GET]
 func pixieHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
-	r := strings.NewReplacer(":", "", "-", "", ".", "")
-
-	pxeconfig, err := w.GetPxeConfig(strings.ToLower(r.Replace(ps.ByName("macaddr"))))
+	pxeconfig, err := w.GetPxeConfig(ps.ByName("macaddr"))
 
 	if err != nil {
 		log.Println(err)
@@ -247,10 +262,6 @@ func main() {
 	}
 
 	r := httprouter.New()
-	r.GET("/list",
-		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			listMachinesHandler(response, request, ps, w)
-		})
 	r.PUT("/build/:hostname/:type",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			buildHandler(response, request, ps, w)
@@ -263,10 +274,19 @@ func main() {
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			status(response, request, ps, w)
 		})
+	r.GET("/cleanhistory",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			cleanHistory(response, request, ps, w)
+		})
 	r.GET("/definition/:hostname",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			definitionHandler(response, request, ps, w)
 		})
+	r.GET("/job/:token",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			jobDefinitionHandler(response, request, ps, w)
+		})
+
 	r.GET("/done/:hostname/:token",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			doneHandler(response, request, ps, w)
