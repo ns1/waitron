@@ -24,6 +24,8 @@ type BuildType struct {
 	Preseed         string `yaml:"preseed,omitempty"`
 	Params          map[string]string
 
+	StaleBuildThresholdSeconds int `yaml:"stale_build_threshold_secs,omitempty"`
+
 	StaleBuildCommands  []BuildCommand `yaml:"stalebuild_commands,omitempty"`
 	PreBuildCommands    []BuildCommand `yaml:"prebuild_commands,omitempty"`
 	PostBuildCommands   []BuildCommand `yaml:"postbuild_commands,omitempty"`
@@ -49,10 +51,9 @@ type Config struct {
 	StaticFilesPath string `yaml:"staticspath,omitempty"`
 	BaseURL         string `yaml:"baseurl,omitempty"`
 
-	MachineInventoryPlugins    []MachineInventoryPluginSettings `yaml:"inventory_plugins,omitempty"`
-	BuildTypes                 map[string]BuildType             `yaml:"build_types,omitempty"`
-	StaleBuildCheckFrequency   int                              `yaml:"stale_build_check_frequency_secs,omitempty"`
-	StaleBuildThresholdSeconds int                              `yaml:"stale_build_threshold_secs,omitempty"`
+	MachineInventoryPlugins  []MachineInventoryPluginSettings `yaml:"inventory_plugins,omitempty"`
+	BuildTypes               map[string]BuildType             `yaml:"build_types,omitempty"`
+	StaleBuildCheckFrequency int                              `yaml:"stale_build_check_frequency_secs,omitempty"`
 
 	BuildType `yaml:",inline"`
 }

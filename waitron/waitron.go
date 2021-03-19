@@ -107,6 +107,9 @@ func New(c config.Config) *Waitron {
 	return w
 }
 
+/*
+	Just some quick and dirty buffered logging.  This function can/should/will be passed around to plugins.
+*/
 func (w *Waitron) AddLog(s string, l int) bool {
 	select {
 	case w.logs <- s:
@@ -116,6 +119,9 @@ func (w *Waitron) AddLog(s string, l int) bool {
 	}
 }
 
+/*
+	Create an array of plugin instances.  Only enabled/active plugins will be loaded.
+*/
 func (w *Waitron) initPlugins() error {
 	for _, cp := range w.config.MachineInventoryPlugins {
 		if !cp.Disabled {
@@ -355,7 +361,8 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 	r := strings.NewReplacer(":", "", "-", "", ".", "")
 
 	for i := 0; i < len(j.Machine.Network); i++ {
-		macs = append(macs, strings.ToLower(r.Replace(j.Machine.Network[i].MacAddress)))
+		j.Machine.Network[i].MacAddress = strings.ToLower(r.Replace(j.Machine.Network[i].MacAddress))
+		macs = append(macs, j.Machine.Network[i].MacAddress)
 	}
 
 	log.Println(fmt.Sprintf("job %s added", token))
@@ -414,6 +421,9 @@ func (w *Waitron) GetMergedMachine(hostname string, mac string) (*machine.Machin
 	return m, nil
 }
 
+/*
+	Retrieves the current ACTIVE job status for related to a hostname
+*/
 func (w *Waitron) GetMachineStatus(hostname string) (string, error) {
 	j, err := w.getActiveJob(hostname, "")
 	if err != nil {
@@ -426,6 +436,9 @@ func (w *Waitron) GetMachineStatus(hostname string) (string, error) {
 	return j.Status, nil
 }
 
+/*
+	Retrieves the job status related to a job token if it's currently active.
+*/
 func (w *Waitron) GetActiveJobStatus(token string) (string, error) {
 	j, err := w.getActiveJob("", token)
 	if err != nil {
@@ -438,6 +451,9 @@ func (w *Waitron) GetActiveJobStatus(token string) (string, error) {
 	return j.Status, nil
 }
 
+/*
+	Retrieves the job status related to a job token, whether or not it's current active
+*/
 func (w *Waitron) GetJobStatus(token string) (string, error) {
 	w.history.RLock()
 	defer w.history.RUnlock()
@@ -454,6 +470,9 @@ func (w *Waitron) GetJobStatus(token string) (string, error) {
 	return j.Status, nil
 }
 
+/*
+	Adds a new build job
+*/
 func (w *Waitron) addJob(j *Job, token string, hostname string, macs []string) error {
 	w.jobs.Lock()
 	defer w.jobs.Unlock()
@@ -472,6 +491,10 @@ func (w *Waitron) addJob(j *Job, token string, hostname string, macs []string) e
 	return nil
 }
 
+/*
+	Retrieves the job struct to a job token or hostname if it's currently active.
+	If hostname and token are both passed, they much point to the same job.
+*/
 func (w *Waitron) getActiveJob(hostname string, token string) (*Job, error) {
 	w.jobs.RLock()
 	defer w.jobs.RUnlock()
@@ -504,6 +527,11 @@ func (w *Waitron) getActiveJob(hostname string, token string) (*Job, error) {
 
 }
 
+/*
+	Retrieves the PXE config based on the details of the job related to the specified MAC.
+	This will/should be called when Waitron receives a request from something pixiecore, which is basically forwarding along
+	the MAC from the DHCP request.
+*/
 func (w *Waitron) GetPxeConfig(macaddress string) (PixieConfig, error) {
 
 	// Normalize the MAC
@@ -561,6 +589,9 @@ func (w *Waitron) GetPxeConfig(macaddress string) (PixieConfig, error) {
 	return pixieConfig, nil
 }
 
+/*
+	Clean up the references to the job, excluding from the job history
+*/
 func (w *Waitron) cleanUpJob(j *Job, status string) error {
 	// Take the list of all macs found in that Jobs Machine->Network
 	// Use host, token, and list of MACs to clean out the details from Jobs
@@ -586,6 +617,9 @@ func (w *Waitron) cleanUpJob(j *Job, status string) error {
 	return nil
 }
 
+/*
+	Perform any final/post-build actions and then clean up the job refernces.
+*/
 func (w *Waitron) FinishBuild(hostname string, token string) error {
 
 	j, err := w.getActiveJob(hostname, token)
@@ -602,6 +636,9 @@ func (w *Waitron) FinishBuild(hostname string, token string) error {
 	return w.cleanUpJob(j, "completed")
 }
 
+/*
+	Perform any final/cancel actions and then clean up the job references.
+*/
 func (w *Waitron) CancelBuild(hostname string, token string) error {
 
 	j, err := w.getActiveJob(hostname, token)
@@ -618,6 +655,10 @@ func (w *Waitron) CancelBuild(hostname string, token string) error {
 	return w.cleanUpJob(j, "terminated")
 }
 
+/*
+	Remove all completed (non-active) jobs from the Job history.
+	Eventually the in-memory job history will need pruning.  This handles that.
+*/
 func (w *Waitron) CleanHistory() error {
 	// Loop through all items in JobsHistory and check existence in Waitron.jobs.JobByToken
 	// If not found, it's either completed or terminated and can be cleaned out.
@@ -636,6 +677,9 @@ func (w *Waitron) CleanHistory() error {
 	return nil
 }
 
+/*
+	Returns a binary-blob representation of the current job history.
+*/
 func (w *Waitron) GetJobsHistoryBlob() ([]byte, error) {
 	w.history.RLock()
 	defer w.history.RUnlock()
@@ -685,6 +729,9 @@ func (w *Waitron) GetJobsHistoryBlob() ([]byte, error) {
 	return w.historyBlobCache, nil
 }
 
+/*
+	Returns a binary-blob representation of the specified job.
+*/
 func (w *Waitron) GetJobBlob(token string) ([]byte, error) {
 
 	w.history.RLock()
@@ -706,15 +753,15 @@ func (w *Waitron) GetJobBlob(token string) ([]byte, error) {
 	return b, nil
 }
 
+/*
+	Returns a fully rendered template for the ACTIVE job specified by the token.
+*/
 func (w *Waitron) RenderStageTemplate(token string, template string) (string, error) {
 
 	j, err := w.getActiveJob("", token)
 	if err != nil {
 		return "unknown", err
 	}
-
-	j.RLock()
-	defer j.RUnlock()
 
 	// Render preseed as default
 	if template == "finish" {
@@ -726,7 +773,18 @@ func (w *Waitron) RenderStageTemplate(token string, template string) (string, er
 	return w.renderTemplate(template, j)
 }
 
+/*
+	Performs the actual template rendering for a job and specified template.
+*/
 func (w *Waitron) renderTemplate(templateName string, j *Job) (string, error) {
+
+	j.Lock()
+	j.Status = "template_processing"
+	j.StatusReason = "processing " + templateName
+	j.Unlock()
+
+	j.RLock()
+	defer j.RUnlock()
 
 	templateName = path.Join(w.config.TemplatePath, templateName)
 	if _, err := os.Stat(templateName); err != nil {
