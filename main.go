@@ -210,8 +210,7 @@ func cleanHistory(response http.ResponseWriter, request *http.Request, ps httpro
 // @Description Dictionary with kernel, intrd(s) and commandline for pixiecore
 // @Param macaddr    path    string    true    "MacAddress"
 // @Success 200    {object} string "Dictionary with kernel, intrd(s) and commandline for pixiecore"
-// @Failure 404    {object} string "Not in build mode"
-// @Failure 500    {object} string "Unable to find host definition for hostname"
+// @Failure 500    {object} string "failed to get pxe config"
 // @Router /v1/boot/{macaddr} [GET]
 func pixieHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
@@ -325,7 +324,7 @@ func main() {
 	}
 
 	if err := w.Run(); err != nil {
-		log.Fatal("waitron instance failed to run: %v", err)
+		log.Fatal(fmt.Sprintf("waitron instance failed to run: %v", err))
 	}
 
 	log.Println("Starting Server on " + *address + ":" + *port)
