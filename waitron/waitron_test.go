@@ -150,6 +150,11 @@ func TestWaitron(t *testing.T) {
 		return
 	}
 
+	if token2, _ := w.Build("test01.prod", ""); token2 != "" {
+		t.Errorf("simultaneous builds for a single host were permitted: %s", token)
+		return
+	}
+
 	/******************************************************************/
 
 	status, err := w.GetJobStatus(token)

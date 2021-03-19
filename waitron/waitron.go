@@ -142,6 +142,9 @@ func (w *Waitron) initPlugins() error {
 	return nil
 }
 
+/*
+	Perform any init work that needs to be done before running things.
+*/
 func (w *Waitron) Init() error {
 	if err := w.initPlugins(); err != nil {
 		return err
@@ -150,6 +153,9 @@ func (w *Waitron) Init() error {
 	return nil
 }
 
+/*
+	Start up any necessary go-routines.
+*/
 func (w *Waitron) Run() error {
 
 	if w.config.StaleBuildCheckFrequency <= 0 {
@@ -190,6 +196,9 @@ func (w *Waitron) Run() error {
 	return nil
 }
 
+/*
+	Broadcast "done" and wait for any go-routines to return.
+*/
 func (w *Waitron) Stop() error {
 	close(w.done) // Was going to use <- struct{}{} since the use case is so simple but figured close() will get my attention if we make sync-related changes in the future.
 	w.wg.Wait()
@@ -197,6 +206,9 @@ func (w *Waitron) Stop() error {
 	return nil
 }
 
+/*
+	Loop through all active jobs and run stale-commands for any that have crossed their StaleBuildThresholdSeconds
+*/
 func (w *Waitron) checkForStaleJobs() {
 
 	staleJobs := make([]*Job, 0)
@@ -218,7 +230,9 @@ func (w *Waitron) checkForStaleJobs() {
 	}
 }
 
-// This should ensure that even commands that spawn child processes are cleaned up correctly, along with their children.
+/*
+	This should ensure that even commands that spawn child processes are cleaned up correctly, along with their children.
+*/
 func (w *Waitron) timedCommandOutput(timeout time.Duration, command string) (out []byte, err error) {
 	cmd := exec.Command("bash", "-c", command)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -232,6 +246,9 @@ func (w *Waitron) timedCommandOutput(timeout time.Duration, command string) (out
 	return out, err
 }
 
+/*
+	Loop through any passed in commands, render them, and execute them.
+*/
 func (w *Waitron) runBuildCommands(j *Job, b []config.BuildCommand) error {
 	for _, buildCommand := range b {
 
@@ -267,8 +284,9 @@ func (w *Waitron) runBuildCommands(j *Job, b []config.BuildCommand) error {
 	return nil
 }
 
-// buildType can be normal, rescue, etc.
-// Waitron can load a table from config of build_types with separate definitions, which can include whether "stale" make sense, so we can stop stale alerts for rescued machines.
+/*
+	Create a register a new job for the specified hostname, and optionally the build type.
+*/
 func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 	/*
 		Since the details of a BuildType can also exist directly in the root config,
@@ -282,6 +300,11 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 		If present, we should be merging on top of that build type and not the one passed in herethen have to "rebase" the machine onto the build type it's requesting.
 		If not present, then it will be set from buildType - This must happen so that when the macaddress comes in for the pxe config, we will know what to serve.
 	*/
+
+	// Error or not, if an existing job was found, no new job permitted.
+	if _, found, _ := w.getActiveJob(hostname, ""); found {
+		return "", fmt.Errorf("active job for '%s' must complete or be terminated before new job", hostname)
+	}
 
 	// Generate a job token, which can optionally be used to authenticate requests.
 	token := uuid.New().String()
@@ -324,8 +347,6 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 			return "", err
 		}
 	}
-
-	log.Print(fmt.Sprintf("MACHINE %s: %v", token, baseMachine))
 
 	// Finally, merge in the machine-specific details.
 	if f, err := yaml.Marshal(foundMachine); err == nil {
@@ -425,7 +446,7 @@ func (w *Waitron) GetMergedMachine(hostname string, mac string) (*machine.Machin
 	Retrieves the current ACTIVE job status for related to a hostname
 */
 func (w *Waitron) GetMachineStatus(hostname string) (string, error) {
-	j, err := w.getActiveJob(hostname, "")
+	j, _, err := w.getActiveJob(hostname, "")
 	if err != nil {
 		return "unknown", err
 	}
@@ -440,7 +461,7 @@ func (w *Waitron) GetMachineStatus(hostname string) (string, error) {
 	Retrieves the job status related to a job token if it's currently active.
 */
 func (w *Waitron) GetActiveJobStatus(token string) (string, error) {
-	j, err := w.getActiveJob("", token)
+	j, _, err := w.getActiveJob("", token)
 	if err != nil {
 		return "unknown", err
 	}
@@ -495,7 +516,7 @@ func (w *Waitron) addJob(j *Job, token string, hostname string, macs []string) e
 	Retrieves the job struct to a job token or hostname if it's currently active.
 	If hostname and token are both passed, they much point to the same job.
 */
-func (w *Waitron) getActiveJob(hostname string, token string) (*Job, error) {
+func (w *Waitron) getActiveJob(hostname string, token string) (*Job, bool, error) {
 	w.jobs.RLock()
 	defer w.jobs.RUnlock()
 
@@ -512,7 +533,7 @@ func (w *Waitron) getActiveJob(hostname string, token string) (*Job, error) {
 		jAgain, foundAgain := w.jobs.jobByToken[token]
 
 		if (found && foundAgain) && j != jAgain {
-			return nil, errors.New("hostname/Job mismatch")
+			return nil, found, errors.New("hostname/Job mismatch")
 		}
 
 		found = foundAgain
@@ -520,10 +541,10 @@ func (w *Waitron) getActiveJob(hostname string, token string) (*Job, error) {
 	}
 
 	if !found {
-		return nil, fmt.Errorf("job not found: '%s' '%s' ", hostname, token)
+		return nil, found, fmt.Errorf("job not found: '%s' '%s' ", hostname, token)
 	}
 
-	return j, nil
+	return j, found, nil
 
 }
 
@@ -622,7 +643,7 @@ func (w *Waitron) cleanUpJob(j *Job, status string) error {
 */
 func (w *Waitron) FinishBuild(hostname string, token string) error {
 
-	j, err := w.getActiveJob(hostname, token)
+	j, _, err := w.getActiveJob(hostname, token)
 
 	if err != nil {
 		return err
@@ -641,7 +662,7 @@ func (w *Waitron) FinishBuild(hostname string, token string) error {
 */
 func (w *Waitron) CancelBuild(hostname string, token string) error {
 
-	j, err := w.getActiveJob(hostname, token)
+	j, _, err := w.getActiveJob(hostname, token)
 
 	if err != nil {
 		return err
@@ -758,7 +779,7 @@ func (w *Waitron) GetJobBlob(token string) ([]byte, error) {
 */
 func (w *Waitron) RenderStageTemplate(token string, template string) (string, error) {
 
-	j, err := w.getActiveJob("", token)
+	j, _, err := w.getActiveJob("", token)
 	if err != nil {
 		return "unknown", err
 	}
