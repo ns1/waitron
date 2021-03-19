@@ -180,8 +180,8 @@ func hostStatus(response http.ResponseWriter, request *http.Request, ps httprout
 }
 
 // @Title status
-// @Description Dictionary with machines and its status
-// @Success 200    {object} string "Dictionary with machines and its status"
+// @Description Dictionary with jobs and status
+// @Success 200    {object} string "Dictionary with jobs and status"
 // @Router /status [GET]
 func status(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 	result, _ := w.GetJobsHistoryBlob()

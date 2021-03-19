@@ -91,7 +91,7 @@ func New(c config.Config) *Waitron {
 		config:                c,
 		jobs:                  Jobs{},
 		history:               JobsHistory{},
-		historyBlobLastCached: time.Time{},
+		historyBlobLastCached: time.Now().Add(time.Hour * -1),
 		done:                  make(chan struct{}, 1),
 		wg:                    sync.WaitGroup{},
 		activePlugins:         make([]inventoryplugins.MachineInventoryPlugin, 0, 1),
@@ -645,6 +645,7 @@ func (w *Waitron) GetJobsHistoryBlob() ([]byte, error) {
 	// Seems efficient...
 	// https://github.com/golang/go/blob/0bd308ff27822378dc2db77d6dd0ad3c15ed2e08/src/runtime/map.go#L118
 	if len(w.history.jobByToken) == 0 {
+		w.AddLog("no jobs, so returning empty job history", 3)
 		return []byte("[]"), nil
 	}
 
@@ -653,12 +654,12 @@ func (w *Waitron) GetJobsHistoryBlob() ([]byte, error) {
 
 	// This is simple but seems kind of dumb, but every suggested solution wen't crazy with marshal and unmarshal,
 	// which also seems dumb here but less simple. Did I miss something silly?
-	if w.historyBlobLastCached.Sub(time.Now()).Seconds() < 20 {
+	if time.Now().Sub(w.historyBlobLastCached).Seconds() < 20 {
+		w.AddLog("returning valid history cache", 3)
 		return w.historyBlobCache, nil
 	}
 
-	w.AddLog("rebuilding stale history blob cache", 0)
-
+	w.AddLog(fmt.Sprintf("rebuilding stale history blob cache of %d jobs", len(w.history.jobByToken)), 0)
 	w.historyBlobCache = make([]byte, 1, 256*len(w.history.jobByToken))
 	w.historyBlobCache[0] = '['
 

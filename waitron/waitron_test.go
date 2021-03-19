@@ -261,14 +261,24 @@ func TestWaitron(t *testing.T) {
 	}
 
 	/******************************************************************/
-
-	if _, err = w.GetJobsHistoryBlob(); err != nil {
+	blob, err := w.GetJobsHistoryBlob()
+	if err != nil {
 		t.Errorf("Failed to get jobs history blob: %v", err)
 		return
 	}
 
-	if _, err = w.GetJobBlob(token); err != nil {
-		t.Errorf("Failed to get job blob for known token: %v", err)
+	if len(blob) == 0 {
+		t.Errorf("History blob was unexpectedly empty: %v", blob)
+		return
+	}
+
+	if string(blob) == "[]" {
+		t.Errorf("History blob was unexpectedly has no jobs: %v", blob)
+		return
+	}
+
+	if j, err := w.GetJobBlob(token); err != nil || len(j) == 0 {
+		t.Errorf("Failed to get job blob for known token: err(%v) job(%v)", err, j)
 		return
 	}
 
