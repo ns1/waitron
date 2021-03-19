@@ -38,8 +38,8 @@ type MachineInventoryPluginSettings struct {
 	AuthPassword      string                 `yaml:"auth_password"`
 	AuthToken         string                 `yaml:"auth_token"`
 	AdditionalOptions map[string]interface{} `yaml:"additional_options"`
-	ReadOnly          bool                   `yaml:"read_only", default:"true"`
-	Enabled           bool                   `yaml:"enabled", default:"true"`
+	WriteEnabled      bool                   `yaml:"writable"`
+	Disabled          bool                   `yaml:"disabled"`
 }
 
 // Config is our global configuration file

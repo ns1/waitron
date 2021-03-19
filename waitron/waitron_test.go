@@ -73,14 +73,12 @@ func TestWaitron(t *testing.T) {
 		},
 		MachineInventoryPlugins: []config.MachineInventoryPluginSettings{
 			config.MachineInventoryPluginSettings{
-				Name:    "test1",
-				Type:    "test1",
-				Enabled: true,
+				Name: "test1",
+				Type: "test1",
 			},
 			config.MachineInventoryPluginSettings{
-				Name:    "test2",
-				Type:    "test2",
-				Enabled: true,
+				Name: "test2",
+				Type: "test2",
 			},
 		},
 	}
@@ -88,14 +86,14 @@ func TestWaitron(t *testing.T) {
 	w := waitron.New(cf)
 
 	/************** Stand up **************/
-	if err := inventoryplugins.AddMachineInventoryPlugin("test1", func(s *config.MachineInventoryPluginSettings, c *config.Config) inventoryplugins.MachineInventoryPlugin {
+	if err := inventoryplugins.AddMachineInventoryPlugin("test1", func(s *config.MachineInventoryPluginSettings, c *config.Config, lf func(string, int) bool) inventoryplugins.MachineInventoryPlugin {
 		return &TestPlugin{}
 	}); err != nil {
 		t.Errorf("Plugin factory failed to add test1 type: %v", err)
 		return
 	}
 
-	if err := inventoryplugins.AddMachineInventoryPlugin("test2", func(s *config.MachineInventoryPluginSettings, c *config.Config) inventoryplugins.MachineInventoryPlugin {
+	if err := inventoryplugins.AddMachineInventoryPlugin("test2", func(s *config.MachineInventoryPluginSettings, c *config.Config, lf func(string, int) bool) inventoryplugins.MachineInventoryPlugin {
 		return &TestPlugin2{}
 	}); err != nil {
 		t.Errorf("Plugin factory failed to add test1 type: %v", err)
@@ -104,6 +102,11 @@ func TestWaitron(t *testing.T) {
 
 	if err := w.Init(); err != nil {
 		t.Errorf("Failed to init: %v", err)
+		return
+	}
+
+	if err := w.Run(); err != nil {
+		t.Errorf("Failed to run: %v", err)
 		return
 	}
 
@@ -283,4 +286,8 @@ func TestWaitron(t *testing.T) {
 
 	/******************************************************************/
 
+	if err := w.Stop(); err != nil {
+		t.Errorf("Failed to stop: %v", err)
+		return
+	}
 }

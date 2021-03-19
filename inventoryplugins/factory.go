@@ -7,7 +7,7 @@ import (
 	"waitron/machine"
 )
 
-var machineInventoryPlugins map[string]func(*config.MachineInventoryPluginSettings, *config.Config) MachineInventoryPlugin = make(map[string]func(*config.MachineInventoryPluginSettings, *config.Config) MachineInventoryPlugin)
+var machineInventoryPlugins map[string]func(*config.MachineInventoryPluginSettings, *config.Config, func(string, int) bool) MachineInventoryPlugin = make(map[string]func(*config.MachineInventoryPluginSettings, *config.Config, func(string, int) bool) MachineInventoryPlugin)
 
 type MachineInventoryPlugin interface {
 	Init() error
@@ -16,7 +16,7 @@ type MachineInventoryPlugin interface {
 	Deinit() error
 }
 
-func AddMachineInventoryPlugin(t string, f func(*config.MachineInventoryPluginSettings, *config.Config) MachineInventoryPlugin) error {
+func AddMachineInventoryPlugin(t string, f func(*config.MachineInventoryPluginSettings, *config.Config, func(string, int) bool) MachineInventoryPlugin) error {
 	if _, found := machineInventoryPlugins[t]; found {
 		return errors.New("plugin type already exists: " + t)
 	}
@@ -26,12 +26,12 @@ func AddMachineInventoryPlugin(t string, f func(*config.MachineInventoryPluginSe
 	return nil
 }
 
-func GetPlugin(t string, s *config.MachineInventoryPluginSettings, c *config.Config) (MachineInventoryPlugin, error) {
+func GetPlugin(t string, s *config.MachineInventoryPluginSettings, c *config.Config, lf func(string, int) bool) (MachineInventoryPlugin, error) {
 	pNew, found := machineInventoryPlugins[t]
 
 	if !found {
 		return nil, errors.New("plugin type not found: " + t)
 	}
 
-	return pNew(s, c), nil
+	return pNew(s, c, lf), nil
 }

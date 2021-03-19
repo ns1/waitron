@@ -59,10 +59,15 @@ type Waitron struct {
 	jobs    Jobs
 	history JobsHistory
 
+	historyBlobLastCached time.Time
+	historyBlobCache      []byte
+
 	done chan struct{}
 	wg   sync.WaitGroup
 
 	activePlugins []inventoryplugins.MachineInventoryPlugin
+
+	logs chan string
 }
 
 func FilterGetValueByKey(in *pongo2.Value, param *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
@@ -83,12 +88,14 @@ func init() {
 
 func New(c config.Config) *Waitron {
 	w := &Waitron{
-		config:        c,
-		jobs:          Jobs{},
-		history:       JobsHistory{},
-		done:          make(chan struct{}, 1),
-		wg:            sync.WaitGroup{},
-		activePlugins: make([]inventoryplugins.MachineInventoryPlugin, 0, 1),
+		config:                c,
+		jobs:                  Jobs{},
+		history:               JobsHistory{},
+		historyBlobLastCached: time.Time{},
+		done:                  make(chan struct{}, 1),
+		wg:                    sync.WaitGroup{},
+		activePlugins:         make([]inventoryplugins.MachineInventoryPlugin, 0, 1),
+		logs:                  make(chan string, 1000),
 	}
 
 	w.history.jobByToken = make(map[string]*Job)
@@ -100,11 +107,20 @@ func New(c config.Config) *Waitron {
 	return w
 }
 
+func (w *Waitron) AddLog(s string, l int) bool {
+	select {
+	case w.logs <- s:
+		return true
+	default:
+		return false
+	}
+}
+
 func (w *Waitron) initPlugins() error {
 	for _, cp := range w.config.MachineInventoryPlugins {
-		if cp.Enabled {
+		if !cp.Disabled {
 
-			p, err := inventoryplugins.GetPlugin(cp.Name, &cp, &w.config)
+			p, err := inventoryplugins.GetPlugin(cp.Name, &cp, &w.config, w.AddLog)
 
 			if err != nil {
 				return err
@@ -151,12 +167,28 @@ func (w *Waitron) Run() error {
 		}
 	}()
 
+	w.wg.Add(1)
+	go func() {
+		w.wg.Done()
+		for lm := range w.logs {
+			log.Print(lm)
+			select {
+			case <-w.done:
+				return
+			default:
+			}
+		}
+
+	}()
+
 	return nil
 }
 
-func (w *Waitron) Stop() {
+func (w *Waitron) Stop() error {
 	close(w.done) // Was going to use <- struct{}{} since the use case is so simple but figured close() will get my attention if we make sync-related changes in the future.
 	w.wg.Wait()
+
+	return nil
 }
 
 func (w *Waitron) checkForStaleJobs() {
@@ -347,21 +379,36 @@ func (w *Waitron) GetMergedMachine(hostname string, mac string) (*machine.Machin
 
 	m := &machine.Machine{}
 
+	anyFound := false
+
+	w.AddLog(fmt.Sprintf("looping through %d active plugins", len(w.activePlugins)), 3)
 	for _, p := range w.activePlugins {
 		pm, err := p.GetMachine(hostname, mac)
 
 		if err != nil {
-			return m, err
+			w.AddLog(fmt.Sprintf("failed to get machine from plugin: %v", err), 3)
+			return nil, err
 		}
 
-		// Just keep merging in details that we find
-		if b, err := yaml.Marshal(pm); err == nil {
-			if err = yaml.Unmarshal(b, m); err != nil {
-				return m, err
+		if pm != nil {
+			// Just keep merging in details that we find
+			if b, err := yaml.Marshal(pm); err == nil {
+				if err = yaml.Unmarshal(b, m); err != nil {
+					// Just log.  Don't let one plugin break everything.
+					w.AddLog(fmt.Sprintf("failed to unmarshal plugin data during machine merging: %v", err), 1)
+					continue
+				}
+			} else {
+				w.AddLog(fmt.Sprintf("failed to marshal plugin data during machine merging: %v", err), 1)
+				continue
 			}
-		} else {
-			return m, err
+
+			anyFound = true
 		}
+	}
+
+	if !anyFound {
+		return nil, fmt.Errorf("'%s' '%s' not found using any active plugin", hostname, mac)
 	}
 
 	return m, nil
@@ -593,6 +640,8 @@ func (w *Waitron) GetJobsHistoryBlob() ([]byte, error) {
 	w.history.RLock()
 	defer w.history.RUnlock()
 
+	// This is the only place that touches historyBlobCache, so the history RLock's above end up working as RW locks for it.
+
 	// Seems efficient...
 	// https://github.com/golang/go/blob/0bd308ff27822378dc2db77d6dd0ad3c15ed2e08/src/runtime/map.go#L118
 	if len(w.history.jobByToken) == 0 {
@@ -604,8 +653,14 @@ func (w *Waitron) GetJobsHistoryBlob() ([]byte, error) {
 
 	// This is simple but seems kind of dumb, but every suggested solution wen't crazy with marshal and unmarshal,
 	// which also seems dumb here but less simple. Did I miss something silly?
-	blob := make([]byte, 1, 256*len(w.history.jobByToken))
-	blob[0] = '['
+	if w.historyBlobLastCached.Sub(time.Now()).Seconds() < 20 {
+		return w.historyBlobCache, nil
+	}
+
+	w.AddLog("rebuilding stale history blob cache", 0)
+
+	w.historyBlobCache = make([]byte, 1, 256*len(w.history.jobByToken))
+	w.historyBlobCache[0] = '['
 
 	for _, job := range w.history.jobByToken {
 
@@ -617,14 +672,16 @@ func (w *Waitron) GetJobsHistoryBlob() ([]byte, error) {
 			return b, err
 		}
 
-		blob = append(blob, ',')
-		blob = append(blob, b...) // So it's not _quite_ as bad as it looks? --> https://stackoverflow.com/questions/16248241/concatenate-two-slices-in-go#comment40751903_16248257
+		w.historyBlobCache = append(w.historyBlobCache, ',')
+		w.historyBlobCache = append(w.historyBlobCache, b...) // So it's not _quite_ as bad as it looks? --> https://stackoverflow.com/questions/16248241/concatenate-two-slices-in-go#comment40751903_16248257
 	}
 
-	blob = append(blob, ']')
-	blob[1] = ' ' // Get rid of that prepended comma of the first item.
+	w.historyBlobCache = append(w.historyBlobCache, ']')
+	w.historyBlobCache[1] = ' ' // Get rid of that prepended comma of the first item.
 
-	return blob, nil
+	w.historyBlobLastCached = time.Now()
+
+	return w.historyBlobCache, nil
 }
 
 func (w *Waitron) GetJobBlob(token string) ([]byte, error) {
