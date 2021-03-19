@@ -313,49 +313,8 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 
 	hostname = strings.ToLower(hostname)
 
-	baseMachine := &machine.Machine{}
-
-	// Get the compile machine details from any plugins being used
-	foundMachine, err := w.GetMergedMachine(hostname, "")
-
-	// Merge in the "global" config.  The marshal/unmarshal combo looks funny, but it's clean and we aren't shooting for warp speed here.
-	if c, err := yaml.Marshal(w.config); err == nil {
-		if err = yaml.Unmarshal(c, baseMachine); err != nil {
-			return "", err
-		}
-	} else {
-		return "", err
-	}
-
-	// Merge in the build type, but allow machines to select their own build type first.
-	if foundMachine.BuildTypeName != "" {
-		buildTypeName = foundMachine.BuildTypeName
-	}
-
-	if buildTypeName != "" {
-		buildType, found := w.config.BuildTypes[buildTypeName]
-
-		if !found {
-			return "", fmt.Errorf("build type '%s' not found", buildTypeName)
-		}
-
-		if b, err := yaml.Marshal(buildType); err == nil {
-			if err = yaml.Unmarshal(b, baseMachine); err != nil {
-				return "", err
-			}
-		} else {
-			return "", err
-		}
-	}
-
-	// Finally, merge in the machine-specific details.
-	if f, err := yaml.Marshal(foundMachine); err == nil {
-		if err = yaml.Unmarshal(f, baseMachine); err != nil {
-			return "", err
-		}
-	} else {
-		return "", err
-	}
+	// Get the compiled machine details from any config, build type, and plugins being used
+	foundMachine, err := w.GetMergedMachine(hostname, "", buildTypeName)
 
 	if err != nil {
 		return "", err
@@ -367,7 +326,7 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 		RWMutex:       sync.RWMutex{},
 		Status:        "pending",
 		StatusReason:  "",
-		Machine:       baseMachine,
+		Machine:       foundMachine,
 		BuildTypeName: buildTypeName,
 		Token:         token,
 	}
@@ -395,21 +354,21 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 }
 
 /*
-This produces a Machine with data compiled from all enabled plugins.
-This is not pulling data from Waitron.  It's pulling external data,
-compiling it, and returning that.
+	This produces a Machine with data compiled from all enabled plugins.
+	This is not pulling data from Waitron.  It's pulling external data,
+	compiling it, and returning that.
 */
-func (w *Waitron) GetMergedMachine(hostname string, mac string) (*machine.Machine, error) {
-	/*
-		Take the hostname and start looping through the inventory plugins
-		Merge details as you get them into a single, compiled Machine object
-	*/
-
+func (w *Waitron) getMergedInventoryMachine(hostname string, mac string) (*machine.Machine, error) {
 	m := &machine.Machine{}
 
 	anyFound := false
 
 	w.AddLog(fmt.Sprintf("looping through %d active plugins", len(w.activePlugins)), 3)
+
+	/*
+		Take the hostname and start looping through the inventory plugins
+		Merge details as you get them into a single, compiled Machine object
+	*/
 	for _, p := range w.activePlugins {
 		pm, err := p.GetMachine(hostname, mac)
 
@@ -435,11 +394,73 @@ func (w *Waitron) GetMergedMachine(hostname string, mac string) (*machine.Machin
 		}
 	}
 
+	// Bail out if we didn't find the machine anywhere.
 	if !anyFound {
 		return nil, fmt.Errorf("'%s' '%s' not found using any active plugin", hostname, mac)
 	}
 
 	return m, nil
+}
+
+/*
+  This produces the final merge machine with config and build type details.
+*/
+func (w *Waitron) GetMergedMachine(hostname string, mac string, buildTypeName string) (*machine.Machine, error) {
+
+	/*
+		We need the "merge" order to go config -> build type -> machine
+		But a machine can also specify a build type for itself, which could have come from any of the available plugins,
+		so we need to take the initial machine compile from plugins, then create a new base machine and start merging
+		things in the order we want because we wouldn't know the true final build type until after the plugins have provided all the details.
+	*/
+	baseMachine := &machine.Machine{}
+
+	foundMachine, err := w.getMergedInventoryMachine(hostname, mac)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Merge in the "global" config.  The marshal/unmarshal combo looks funny, but we've given up completely on speed at this point.
+	if c, err := yaml.Marshal(w.config); err == nil {
+		if err = yaml.Unmarshal(c, baseMachine); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, err
+	}
+
+	// Merge in the build type, but allow machines to select their own build type first.
+	if foundMachine.BuildTypeName != "" {
+		buildTypeName = foundMachine.BuildTypeName
+	}
+
+	if buildTypeName != "" {
+		buildType, found := w.config.BuildTypes[buildTypeName]
+
+		if !found {
+			return nil, fmt.Errorf("build type '%s' not found", buildTypeName)
+		}
+
+		if b, err := yaml.Marshal(buildType); err == nil {
+			if err = yaml.Unmarshal(b, baseMachine); err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+	}
+
+	// Finally, merge in the machine-specific details.
+	if f, err := yaml.Marshal(foundMachine); err == nil {
+		if err = yaml.Unmarshal(f, baseMachine); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, err
+	}
+
+	return baseMachine, nil
 }
 
 /*

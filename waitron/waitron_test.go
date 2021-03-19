@@ -112,7 +112,7 @@ func TestWaitron(t *testing.T) {
 
 	/******************************************************************/
 
-	m, err := w.GetMergedMachine("", "")
+	m, err := w.GetMergedMachine("", "", "")
 
 	if err != nil {
 		t.Errorf("Failed to get merge machine: %v", err)

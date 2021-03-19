@@ -27,18 +27,20 @@ type result struct {
 
 // @Title definitionHandler
 // @Description Return the waitron configuration details for a machine
-// @Param hostname    path    string    true    "Hostname"
+// @Param hostname  path    string    true    "Hostname"
+// @Param type    	path    string    true    "Build Type"
 // @Success 200    {object} string "Machine config in JSON format."
 // @Failure 404    {object} string "Machine not found"
-// @Router /definition/{hostname} [GET]
+// @Router /definition/{hostname}/{buildType} [GET]
 func definitionHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
 	hostname := ps.ByName("hostname")
+	btype := ps.ByName("type")
 
-	m, err := w.GetMergedMachine(hostname, "")
+	m, err := w.GetMergedMachine(hostname, "", btype)
 	if err != nil {
 		log.Println(err)
-		http.Error(response, fmt.Sprintf("Unable to find host definition for %s. %s", hostname, err.Error()), 404)
+		http.Error(response, fmt.Sprintf("Unable to find host definition for '%s' '%s'. %s", hostname, btype, err.Error()), 404)
 		return
 	}
 
@@ -90,7 +92,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request, ps htt
 // @Title buildHandler
 // @Description Put the server in build mode
 // @Param hostname    path    string    true    "Hostname"
-// @Param type        path    string    true    "Type"
+// @Param type        path    string    true    "Build Type"
 // @Success 200    {object} string "{"State": "OK", "Token": <UUID of the build>}"
 // @Failure 500    {object} string "Failed to set build mode on hostname"
 // @Router build/{hostname}/{type} [PUT]
@@ -99,10 +101,10 @@ func buildHandler(response http.ResponseWriter, request *http.Request, ps httpro
 	hostname := ps.ByName("hostname")
 	btype := ps.ByName("type")
 
-	if btype == "" {
-		btype = "default"
-	}
-
+	/*	if btype == "" {
+			btype = "default"
+		}
+	*/
 	token, err := w.Build(hostname, btype)
 	if err != nil {
 		log.Println(err)
@@ -262,6 +264,10 @@ func main() {
 	}
 
 	r := httprouter.New()
+	r.PUT("/build/:hostname",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			buildHandler(response, request, ps, w)
+		})
 	r.PUT("/build/:hostname/:type",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			buildHandler(response, request, ps, w)
@@ -279,6 +285,10 @@ func main() {
 			cleanHistory(response, request, ps, w)
 		})
 	r.GET("/definition/:hostname",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			definitionHandler(response, request, ps, w)
+		})
+	r.GET("/definition/:hostname/:type",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			definitionHandler(response, request, ps, w)
 		})
