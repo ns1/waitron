@@ -101,10 +101,6 @@ func buildHandler(response http.ResponseWriter, request *http.Request, ps httpro
 	hostname := ps.ByName("hostname")
 	btype := ps.ByName("type")
 
-	/*	if btype == "" {
-			btype = "default"
-		}
-	*/
 	token, err := w.Build(hostname, btype)
 	if err != nil {
 		log.Println(err)
@@ -186,7 +182,11 @@ func hostStatus(response http.ResponseWriter, request *http.Request, ps httprout
 // @Success 200    {object} string "Dictionary with jobs and status"
 // @Router /status [GET]
 func status(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
-	result, _ := w.GetJobsHistoryBlob()
+	result, err := w.GetJobsHistoryBlob()
+	if err != nil {
+		http.Error(response, err.Error(), 500)
+		return
+	}
 	response.Write(result)
 }
 
@@ -331,5 +331,6 @@ func main() {
 	log.Println("Starting Server on " + *address + ":" + *port)
 	log.Fatal(http.ListenAndServe(*address+":"+*port, handlers.LoggingHandler(os.Stdout, r)))
 
+	// This is practically a lie since nothing is properly catching signals AFAIK, but maybe in
 	w.Stop()
 }
