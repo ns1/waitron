@@ -59,19 +59,19 @@ type Config struct {
 }
 
 // Loads config.yaml and returns a Config struct
-func LoadConfig(configPath string) (Config, error) {
+func LoadConfig(configPath string) (*Config, error) {
 
 	var c Config
 
 	data, err := ioutil.ReadFile(configPath)
 	if err != nil {
-		return Config{}, err
+		return nil, err
 	}
 
 	err = yaml.Unmarshal(data, &c)
 	if err != nil {
-		return Config{}, err
+		return nil, err
 	}
 
-	return c, nil
+	return &c, nil
 }

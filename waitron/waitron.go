@@ -55,7 +55,7 @@ type Job struct {
 }
 
 type Waitron struct {
-	config  config.Config
+	config  *config.Config
 	jobs    Jobs
 	history JobsHistory
 
@@ -86,7 +86,7 @@ func init() {
 	pongo2.RegisterFilter("key", FilterGetValueByKey)
 }
 
-func New(c config.Config) *Waitron {
+func New(c *config.Config) *Waitron {
 	w := &Waitron{
 		config:                c,
 		jobs:                  Jobs{},
@@ -126,7 +126,7 @@ func (w *Waitron) initPlugins() error {
 	for _, cp := range w.config.MachineInventoryPlugins {
 		if !cp.Disabled {
 
-			p, err := inventoryplugins.GetPlugin(cp.Name, &cp, &w.config, w.AddLog)
+			p, err := inventoryplugins.GetPlugin(cp.Name, &cp, w.config, w.AddLog)
 
 			if err != nil {
 				return err
@@ -570,6 +570,43 @@ func (w *Waitron) getActiveJob(hostname string, token string) (*Job, bool, error
 }
 
 /*
+	This handles special cases if requested by the config used with Waitron.
+	If there doesn't appear to be any job associated with a MAC but the config contains the '_unknown'_
+	build type, Waitron will serve what it has, but it won't perform any status tracking.
+	This is simply a hook to allow power users to load in special "registration" OS images that they can use
+	to, for example, collect and register machine details for new machines into their inventory management system.
+*/
+func (w *Waitron) getPxeConfigForUnknown(b *config.BuildType, macaddress string) (PixieConfig, error) {
+	pixieConfig := PixieConfig{}
+
+	var cmdline, imageURL, kernel, initrd string
+
+	cmdline = b.Cmdline
+	imageURL = b.ImageURL
+	kernel = b.Kernel
+	initrd = b.Initrd
+
+	tpl, err := pongo2.FromString(cmdline)
+	if err != nil {
+		return pixieConfig, err
+	}
+
+	cmdline, err = tpl.Execute(pongo2.Context{"machine": b, "BaseURL": w.config.BaseURL, "Hostname": macaddress, "MAC": macaddress})
+
+	if err != nil {
+		return pixieConfig, err
+	}
+
+	imageURL = strings.TrimRight(imageURL, "/")
+
+	pixieConfig.Kernel = imageURL + "/" + kernel
+	pixieConfig.Initrd = []string{imageURL + "/" + initrd}
+	pixieConfig.Cmdline = cmdline
+
+	return pixieConfig, nil
+}
+
+/*
 	Retrieves the PXE config based on the details of the job related to the specified MAC.
 	This will/should be called when Waitron receives a request from something pixiecore, which is basically forwarding along
 	the MAC from the DHCP request.
@@ -586,7 +623,12 @@ func (w *Waitron) GetPxeConfig(macaddress string) (PixieConfig, error) {
 	w.jobs.RUnlock()
 
 	if !found {
-		return PixieConfig{}, fmt.Errorf("job not found for  '%s'", macaddress)
+		if uBuild, ok := w.config.BuildTypes["_unknown_"]; ok {
+			w.AddLog("going to send _unknown_ details to unknown mac", 3)
+			return w.getPxeConfigForUnknown(&uBuild, macaddress)
+		} else {
+			return PixieConfig{}, fmt.Errorf("job not found for  '%s'", macaddress)
+		}
 	}
 
 	// Build the pxe config based on the compiled machine details.
@@ -802,7 +844,7 @@ func (w *Waitron) RenderStageTemplate(token string, template string) (string, er
 
 	j, _, err := w.getActiveJob("", token)
 	if err != nil {
-		return "unknown", err
+		return "", err
 	}
 
 	// Render preseed as default

@@ -68,7 +68,7 @@ func (t *TestPlugin2) Deinit() error {
 }
 func TestPixieHandlerNotInBuildMode(t *testing.T) {
 
-	cf := config.Config{
+	cf := &config.Config{
 		BuildType: config.BuildType{
 			Cmdline:  "cmd",
 			ImageURL: "image.com",

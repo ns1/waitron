@@ -64,13 +64,14 @@ func (t *TestPlugin2) Deinit() error {
 }
 
 func TestWaitron(t *testing.T) {
-	cf := config.Config{
+	cf := &config.Config{
 		BuildType: config.BuildType{
 			Cmdline:  "cmd",
 			ImageURL: "image.com",
 			Kernel:   "popcorn",
 			Initrd:   "initrd",
 		},
+		BuildTypes: make(map[string]config.BuildType),
 		MachineInventoryPlugins: []config.MachineInventoryPluginSettings{
 			config.MachineInventoryPluginSettings{
 				Name: "test1",
@@ -218,6 +219,31 @@ func TestWaitron(t *testing.T) {
 		t.Errorf("Unexpected PXE config returned: %s", pCfg.Kernel)
 		return
 	}
+
+	/******************************************************************/
+
+	// Sneaky with the pointer usage. Don't do this IRL!
+	cf.BuildTypes["_unknown_"] = config.BuildType{
+		Cmdline:  "cmd",
+		ImageURL: "unknown.com",
+		Kernel:   "sanders",
+		Initrd:   "it_is_rd",
+	}
+
+	uCfg, err := w.GetPxeConfig("un:kn:ow:nt:hi:ng")
+
+	if err != nil {
+		t.Errorf("Failed to return PXE config for unknown MAC when _unknown_ exists: %v", err)
+		return
+	}
+
+	if uCfg.Kernel != "unknown.com/sanders" {
+		t.Errorf("Unexpected PXE config returned for _unknown_: %s", pCfg.Kernel)
+		return
+	}
+	delete(cf.BuildTypes, "unknown_")
+
+	/******************************************************************/
 
 	status, err = w.GetMachineStatus("test01.prod")
 	if err != nil {
