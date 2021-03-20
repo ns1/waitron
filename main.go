@@ -279,6 +279,10 @@ func main() {
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			status(response, request, ps, w)
 		})
+	r.POST("/status/query",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			status(response, request, ps, w)
+		})
 	r.GET("/cleanhistory",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			cleanHistory(response, request, ps, w)
