@@ -22,6 +22,11 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+/*
+	TODO:
+		At least improve how the pre/post/cancel/stale build commands work...
+*/
+
 // PixieConfig boot configuration
 type PixieConfig struct {
 	Kernel  string   `json:"kernel" description:"The kernel file"`
