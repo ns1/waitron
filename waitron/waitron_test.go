@@ -20,7 +20,11 @@ func (t *TestPlugin) Init() error {
 
 func (t *TestPlugin) GetMachine(s string, m string) (*machine.Machine, error) {
 
-	return &machine.Machine{Hostname: "test01.prod", ShortName: "test01"}, nil
+	if s == "test01.prod" {
+		return &machine.Machine{Hostname: "test01.prod", ShortName: "test01"}, nil
+	}
+
+	return nil, nil
 }
 
 func (t *TestPlugin) PutMachine(m *machine.Machine) error {
@@ -52,7 +56,11 @@ func (t *TestPlugin2) GetMachine(s string, m string) (*machine.Machine, error) {
 		},
 	}
 
-	return mm, nil
+	if s == "test01.prod" {
+		return mm, nil
+	}
+
+	return nil, nil
 }
 
 func (t *TestPlugin2) PutMachine(m *machine.Machine) error {
@@ -115,8 +123,20 @@ func TestWaitron(t *testing.T) {
 
 	m, err := w.GetMergedMachine("", "", "")
 
+	if m != nil {
+		t.Errorf("Returned merged machine for unknown machine: %v", err)
+		return
+	}
+
+	m, err = w.GetMergedMachine("test01.prod", "", "")
+
 	if err != nil {
-		t.Errorf("Failed to get merge machine: %v", err)
+		t.Errorf("Error while getting merge machine: %v", err)
+		return
+	}
+
+	if m == nil {
+		t.Errorf("Known machine not found: %v", err)
 		return
 	}
 

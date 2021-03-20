@@ -396,7 +396,7 @@ func (w *Waitron) getMergedInventoryMachine(hostname string, mac string) (*machi
 
 	// Bail out if we didn't find the machine anywhere.
 	if !anyFound {
-		return nil, fmt.Errorf("'%s' '%s' not found using any active plugin", hostname, mac)
+		return nil, nil
 	}
 
 	return m, nil
@@ -419,6 +419,10 @@ func (w *Waitron) GetMergedMachine(hostname string, mac string, buildTypeName st
 
 	if err != nil {
 		return nil, err
+	}
+
+	if foundMachine == nil {
+		return nil, fmt.Errorf("'%s' '%s' not found using any active plugin", hostname, mac)
 	}
 
 	// Merge in the "global" config.  The marshal/unmarshal combo looks funny, but we've given up completely on speed at this point.
@@ -577,6 +581,20 @@ func (w *Waitron) getActiveJob(hostname string, token string) (*Job, bool, error
 	to, for example, collect and register machine details for new machines into their inventory management system.
 */
 func (w *Waitron) getPxeConfigForUnknown(b *config.BuildType, macaddress string) (PixieConfig, error) {
+
+	m, err := w.getMergedInventoryMachine("", macaddress)
+
+	if err != nil {
+		return PixieConfig{}, err
+	}
+
+	// _unknown_ is only for machines we don't know about at all.
+	if m != nil {
+		return PixieConfig{}, fmt.Errorf("job not found for  '%s' and _unknown_ builds not requested", macaddress)
+	}
+
+	w.AddLog("going to send _unknown_ details to unknown mac", 3)
+
 	pixieConfig := PixieConfig{}
 
 	var cmdline, imageURL, kernel, initrd string
@@ -624,7 +642,6 @@ func (w *Waitron) GetPxeConfig(macaddress string) (PixieConfig, error) {
 
 	if !found {
 		if uBuild, ok := w.config.BuildTypes["_unknown_"]; ok {
-			w.AddLog("going to send _unknown_ details to unknown mac", 3)
 			return w.getPxeConfigForUnknown(&uBuild, macaddress)
 		} else {
 			return PixieConfig{}, fmt.Errorf("job not found for  '%s'", macaddress)
@@ -840,7 +857,7 @@ func (w *Waitron) GetJobBlob(token string) ([]byte, error) {
 /*
 	Returns a fully rendered template for the ACTIVE job specified by the token.
 */
-func (w *Waitron) RenderStageTemplate(token string, template string) (string, error) {
+func (w *Waitron) RenderStageTemplate(token string, templateStage string) (string, error) {
 
 	j, _, err := w.getActiveJob("", token)
 	if err != nil {
@@ -848,22 +865,22 @@ func (w *Waitron) RenderStageTemplate(token string, template string) (string, er
 	}
 
 	// Render preseed as default
-	if template == "finish" {
-		template = j.Machine.Finish
-	} else {
-		template = j.Machine.Preseed
+	templateName := j.Machine.Preseed
+
+	if templateStage == "finish" {
+		templateName = j.Machine.Finish
 	}
 
-	return w.renderTemplate(template, j)
+	return w.renderTemplate(templateName, templateStage, j)
 }
 
 /*
 	Performs the actual template rendering for a job and specified template.
 */
-func (w *Waitron) renderTemplate(templateName string, j *Job) (string, error) {
+func (w *Waitron) renderTemplate(templateName string, templateStage string, j *Job) (string, error) {
 
 	j.Lock()
-	j.Status = "template_processing"
+	j.Status = templateStage
 	j.StatusReason = "processing " + templateName
 	j.Unlock()
 

@@ -38,7 +38,7 @@ func definitionHandler(response http.ResponseWriter, request *http.Request, ps h
 	btype := ps.ByName("type")
 
 	m, err := w.GetMergedMachine(hostname, "", btype)
-	if err != nil {
+	if err != nil || m == nil {
 		log.Println(err)
 		http.Error(response, fmt.Sprintf("Unable to find host definition for '%s' '%s'. %s", hostname, btype, err.Error()), 404)
 		return

@@ -24,7 +24,11 @@ func (t *TestPlugin) Init() error {
 
 func (t *TestPlugin) GetMachine(s string, m string) (*machine.Machine, error) {
 
-	return &machine.Machine{Hostname: "test01.prod", ShortName: "test01"}, nil
+	if s == "test01.prod" {
+		return &machine.Machine{Hostname: "test01.prod", ShortName: "test01"}, nil
+	}
+
+	return nil, nil
 }
 
 func (t *TestPlugin) PutMachine(m *machine.Machine) error {
@@ -56,7 +60,11 @@ func (t *TestPlugin2) GetMachine(s string, m string) (*machine.Machine, error) {
 		},
 	}
 
-	return mm, nil
+	if s == "test01.prod" {
+		return mm, nil
+	}
+
+	return nil, nil
 }
 
 func (t *TestPlugin2) PutMachine(m *machine.Machine) error {
