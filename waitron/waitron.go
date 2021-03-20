@@ -699,6 +699,7 @@ func (w *Waitron) cleanUpJob(j *Job, status string) error {
 
 	j.Lock()
 	j.Status = status
+	j.StatusReason = ""
 	j.End = time.Now()
 	j.Unlock()
 
