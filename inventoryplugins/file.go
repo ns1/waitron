@@ -22,12 +22,12 @@ func init() {
 type FileInventoryPlugin struct {
 	settings      *config.MachineInventoryPluginSettings
 	waitronConfig *config.Config
-	Log           func(string, int) bool
+	Log           func(string, config.LogLevel) bool
 
 	machinePath string
 }
 
-func NewFileInventoryPlugin(s *config.MachineInventoryPluginSettings, c *config.Config, lf func(string, int) bool) MachineInventoryPlugin {
+func NewFileInventoryPlugin(s *config.MachineInventoryPluginSettings, c *config.Config, lf func(string, config.LogLevel) bool) MachineInventoryPlugin {
 
 	p := &FileInventoryPlugin{
 		settings:      s, // Plugin settings
@@ -69,7 +69,7 @@ func (p *FileInventoryPlugin) GetMachine(hostname string, macaddress string) (*m
 
 	groupPath, ok := p.settings.AdditionalOptions["grouppath"].(string)
 
-	p.Log(fmt.Sprintf("[%s] looking for %s.[yml|yaml] in %s", p.settings.Name, m.Domain, groupPath), 3)
+	p.Log(fmt.Sprintf("looking for %s.[yml|yaml] in %s", m.Domain, groupPath), config.LogLevelDebug)
 
 	// Move the path settings and checks to Init so we can blow up early.
 	if ok {
@@ -94,40 +94,40 @@ func (p *FileInventoryPlugin) GetMachine(hostname string, macaddress string) (*m
 
 	}
 
-	p.Log(fmt.Sprintf("[%s] looking for %s.[yml|yaml] in %s", p.settings.Name, hostname, p.machinePath), 3)
+	p.Log(fmt.Sprintf("looking for %s.[yml|yaml] in %s", hostname, p.machinePath), config.LogLevelDebug)
 
 	// Then load the machine definition.
 	data, err := ioutil.ReadFile(path.Join(p.machinePath, hostname+".yaml")) // compute01.apc03.prod.yaml
 
-	p.Log(fmt.Sprintf("[%s] first attempt at slurping %s.[yml|yaml] in %s", p.settings.Name, hostname, p.machinePath), 3)
+	p.Log(fmt.Sprintf("first attempt at slurping %s.[yml|yaml] in %s", hostname, p.machinePath), config.LogLevelDebug)
 
 	if err != nil {
 		if os.IsNotExist(err) {
 
 			data, err = ioutil.ReadFile(path.Join(p.machinePath, hostname+".yml")) // One more try but look for .yml
-			p.Log(fmt.Sprintf("[%s] second attempt at slurping %s.[yml|yaml] in %s", p.settings.Name, hostname, p.machinePath), 3)
+			p.Log(fmt.Sprintf("second attempt at slurping %s.[yml|yaml] in %s", hostname, p.machinePath), config.LogLevelDebug)
 
 			if err != nil {
 				if os.IsNotExist(err) { // Whether the error was due to non-existence or something else, report it.  Machine definitions are must.
-					p.Log(fmt.Sprintf("[%s] %s.[yml|yaml] not found in %s", p.settings.Name, hostname, p.machinePath), 3)
+					p.Log(fmt.Sprintf("%s.[yml|yaml] not found in %s", hostname, p.machinePath), config.LogLevelDebug)
 					return nil, nil
 				} else {
-					p.Log(fmt.Sprintf("[%s] %v", p.settings.Name, err), 3)
+					p.Log(fmt.Sprintf("%v", err), config.LogLevelDebug)
 					return nil, err // Some error beyond just "not found"
 				}
 			}
 		} else {
-			p.Log(fmt.Sprintf("[%s] %v", p.settings.Name, err), 3)
+			p.Log(fmt.Sprintf("%v", err), config.LogLevelDebug)
 			return nil, err // Some error beyond just "not found"
 		}
 	}
 
-	p.Log(fmt.Sprintf("[%s] %s.[yml|yaml] slurped in from %s", p.settings.Name, hostname, p.machinePath), 3)
+	p.Log(fmt.Sprintf("%s.[yml|yaml] slurped in from %s", hostname, p.machinePath), config.LogLevelDebug)
 
 	err = yaml.Unmarshal(data, m)
 	if err != nil {
 		// Don't blow everything up on bad data.  Only truly critical errors should be passed back.
-		p.Log(fmt.Sprintf("[%s] unable to unmarshal %s.[yml|yaml]: %v", p.settings.Name, hostname, err), 1)
+		p.Log(fmt.Sprintf("unable to unmarshal %s.[yml|yaml]: %v", hostname, err), config.LogLevelError)
 		return nil, nil
 	}
 

@@ -39,7 +39,6 @@ func definitionHandler(response http.ResponseWriter, request *http.Request, ps h
 
 	m, err := w.GetMergedMachine(hostname, "", btype)
 	if err != nil || m == nil {
-		log.Println(err)
 		http.Error(response, fmt.Sprintf("Unable to find host definition for '%s' '%s'. %s", hostname, btype, err.Error()), 404)
 		return
 	}
@@ -61,7 +60,6 @@ func jobDefinitionHandler(response http.ResponseWriter, request *http.Request, p
 
 	jb, err := w.GetJobBlob(token)
 	if err != nil {
-		log.Println(err)
 		http.Error(response, fmt.Sprintf("Unable to find valid job for %s. %s", token, err.Error()), 404)
 		return
 	}
@@ -81,7 +79,6 @@ func templateHandler(response http.ResponseWriter, request *http.Request, ps htt
 
 	renderedTemplate, err := w.RenderStageTemplate(ps.ByName("token"), ps.ByName("template"))
 	if err != nil {
-		log.Println(err)
 		http.Error(response, "Unable to render template", 400)
 		return
 	}
@@ -103,7 +100,6 @@ func buildHandler(response http.ResponseWriter, request *http.Request, ps httpro
 
 	token, err := w.Build(hostname, btype)
 	if err != nil {
-		log.Println(err)
 		http.Error(response, fmt.Sprintf("Failed to set build mode for %s - %s: %s", hostname, btype, err.Error()), 500)
 		return
 	}
@@ -127,7 +123,6 @@ func doneHandler(response http.ResponseWriter, request *http.Request, ps httprou
 	err := w.FinishBuild(ps.ByName("hostname"), ps.ByName("token"))
 
 	if err != nil {
-		log.Println(err)
 		http.Error(response, "Failed to finish build.", 500)
 		return
 	}
@@ -151,7 +146,6 @@ func cancelHandler(response http.ResponseWriter, request *http.Request, ps httpr
 	err := w.CancelBuild(ps.ByName("hostname"), ps.ByName("token"))
 
 	if err != nil {
-		log.Println(err)
 		http.Error(response, "Failed to cancel build mode", 500)
 		return
 	}
@@ -165,13 +159,16 @@ func cancelHandler(response http.ResponseWriter, request *http.Request, ps httpr
 // @Description Build status of the server
 // @Param hostname    path    string    true    "Hostname"
 // @Success 200    {object} string "The status: (installing or installed)"
-// @Failure 500    {object} string "Unknown state"
+// @Failure 404    {object} string "Failed to find active job for host"
 // @Router /status/{hostname} [GET]
 func hostStatus(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
-	s, err := w.GetMachineStatus(ps.ByName("hostname"))
+
+	hostname := ps.ByName("hostname")
+	s, err := w.GetMachineStatus(hostname)
 
 	if err != nil {
 		http.Error(response, s, 500)
+		http.Error(response, fmt.Sprintf("Failed to find active job for %s. %s", hostname, err.Error()), 404)
 		return
 	}
 	fmt.Fprintf(response, s)
@@ -217,7 +214,6 @@ func pixieHandler(response http.ResponseWriter, request *http.Request, ps httpro
 	pxeconfig, err := w.GetPxeConfig(ps.ByName("macaddr"))
 
 	if err != nil {
-		log.Println(err)
 		http.Error(response, "failed to get pxe config", 500)
 		return
 	}
@@ -332,7 +328,7 @@ func main() {
 	}
 
 	log.Println("Starting Server on " + *address + ":" + *port)
-	log.Fatal(http.ListenAndServe(*address+":"+*port, handlers.LoggingHandler(os.Stdout, r)))
+	log.Fatal(http.ListenAndServe(*address+":"+*port, handlers.LoggingHandler(w.GetLogger(), r)))
 
 	// This is practically a lie since nothing is properly catching signals AFAIK, but maybe in
 	w.Stop()

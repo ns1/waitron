@@ -6,6 +6,19 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+type LogLevel int
+
+const (
+	LogLevelError LogLevel = iota
+	LogLevelWarning
+	LogLevelInfo
+	LogLevelDebug
+)
+
+func (l LogLevel) String() string {
+	return [...]string{"ERROR", "WARN", "INFO", "DEBUG"}[l]
+}
+
 type BuildCommand struct {
 	Command        string
 	TimeoutSeconds int  `yaml:"timeout_seconds"`
@@ -54,6 +67,8 @@ type Config struct {
 	MachineInventoryPlugins  []MachineInventoryPluginSettings `yaml:"inventory_plugins,omitempty"`
 	BuildTypes               map[string]BuildType             `yaml:"build_types,omitempty"`
 	StaleBuildCheckFrequency int                              `yaml:"stale_build_check_frequency_secs,omitempty"`
+	HistoryCacheSeconds      int                              `yaml:"history_cache_seconds"`
+	LogLevel                 LogLevel                         `yaml:"log_level"`
 
 	BuildType `yaml:",inline"`
 }

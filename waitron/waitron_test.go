@@ -95,14 +95,14 @@ func TestWaitron(t *testing.T) {
 	w := waitron.New(cf)
 
 	/************** Stand up **************/
-	if err := inventoryplugins.AddMachineInventoryPlugin("test1", func(s *config.MachineInventoryPluginSettings, c *config.Config, lf func(string, int) bool) inventoryplugins.MachineInventoryPlugin {
+	if err := inventoryplugins.AddMachineInventoryPlugin("test1", func(s *config.MachineInventoryPluginSettings, c *config.Config, lf func(string, config.LogLevel) bool) inventoryplugins.MachineInventoryPlugin {
 		return &TestPlugin{}
 	}); err != nil {
 		t.Errorf("Plugin factory failed to add test1 type: %v", err)
 		return
 	}
 
-	if err := inventoryplugins.AddMachineInventoryPlugin("test2", func(s *config.MachineInventoryPluginSettings, c *config.Config, lf func(string, int) bool) inventoryplugins.MachineInventoryPlugin {
+	if err := inventoryplugins.AddMachineInventoryPlugin("test2", func(s *config.MachineInventoryPluginSettings, c *config.Config, lf func(string, config.LogLevel) bool) inventoryplugins.MachineInventoryPlugin {
 		return &TestPlugin2{}
 	}); err != nil {
 		t.Errorf("Plugin factory failed to add test1 type: %v", err)
@@ -261,7 +261,7 @@ func TestWaitron(t *testing.T) {
 		t.Errorf("Unexpected PXE config returned for _unknown_: %s", pCfg.Kernel)
 		return
 	}
-	delete(cf.BuildTypes, "unknown_")
+	delete(cf.BuildTypes, "_unknown_")
 
 	/******************************************************************/
 

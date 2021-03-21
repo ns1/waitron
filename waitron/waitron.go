@@ -24,7 +24,8 @@ import (
 
 /*
 	TODO:
-		At least improve how the pre/post/cancel/stale build commands work...
+		At least improve how the pre/post/cancel/stale build commands work
+		Figure out logging
 */
 
 // PixieConfig boot configuration
@@ -115,14 +116,39 @@ func New(c *config.Config) *Waitron {
 /*
 	Just some quick and dirty buffered logging.  This function can/should/will be passed around to plugins.
 */
-func (w *Waitron) AddLog(s string, l int) bool {
+func (w *Waitron) addLog(s string, l config.LogLevel) bool {
+
+	if l > w.config.LogLevel {
+		return true
+	}
+
 	select {
-	case w.logs <- s:
+	case w.logs <- fmt.Sprintf("[%s] %s", l, s):
 		return true
 	default:
 		return false
 	}
 }
+
+/*********** super hacky, sorry...  *************/
+type WaitronLogger struct {
+	wf func(string, config.LogLevel) bool
+}
+
+func (wl WaitronLogger) Write(b []byte) (int, error) {
+
+	if wl.wf(string(b), config.LogLevelInfo) {
+		return len(b), nil
+	} else {
+		return 0, fmt.Errorf("log channel is full")
+	}
+
+}
+func (w *Waitron) GetLogger() WaitronLogger {
+	return WaitronLogger{wf: w.addLog}
+}
+
+/************************************************/
 
 /*
 	Create an array of plugin instances.  Only enabled/active plugins will be loaded.
@@ -131,7 +157,7 @@ func (w *Waitron) initPlugins() error {
 	for _, cp := range w.config.MachineInventoryPlugins {
 		if !cp.Disabled {
 
-			p, err := inventoryplugins.GetPlugin(cp.Name, &cp, w.config, w.AddLog)
+			p, err := inventoryplugins.GetPlugin(cp.Name, &cp, w.config, w.addLog)
 
 			if err != nil {
 				return err
@@ -151,6 +177,7 @@ func (w *Waitron) initPlugins() error {
 	Perform any init work that needs to be done before running things.
 */
 func (w *Waitron) Init() error {
+
 	if err := w.initPlugins(); err != nil {
 		return err
 	}
@@ -229,7 +256,7 @@ func (w *Waitron) checkForStaleJobs() {
 	for _, j := range staleJobs {
 		go func() {
 			if err := w.runBuildCommands(j, j.Machine.StaleBuildCommands); err != nil {
-				log.Print(err)
+				w.addLog(err.Error(), config.LogLevelError)
 			}
 		}()
 	}
@@ -271,7 +298,7 @@ func (w *Waitron) runBuildCommands(j *Job, b []config.BuildCommand) error {
 		j.RUnlock()
 
 		if buildCommand.ShouldLog {
-			log.Println(cmdline)
+			w.addLog(cmdline, config.LogLevelInfo)
 		}
 
 		if err != nil {
@@ -314,7 +341,7 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 	// Generate a job token, which can optionally be used to authenticate requests.
 	token := uuid.New().String()
 
-	log.Println(fmt.Sprintf("%s job token generated: %s", hostname, token))
+	w.addLog(fmt.Sprintf("%s job token generated: %s", hostname, token), config.LogLevelInfo)
 
 	hostname = strings.ToLower(hostname)
 
@@ -350,7 +377,8 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 		macs = append(macs, j.Machine.Network[i].MacAddress)
 	}
 
-	log.Println(fmt.Sprintf("job %s added", token))
+	w.addLog(fmt.Sprintf("job %s added", token), config.LogLevelInfo)
+
 	if err = w.addJob(j, token, hostname, macs); err != nil {
 		return "", err
 	}
@@ -368,7 +396,7 @@ func (w *Waitron) getMergedInventoryMachine(hostname string, mac string) (*machi
 
 	anyFound := false
 
-	w.AddLog(fmt.Sprintf("looping through %d active plugins", len(w.activePlugins)), 3)
+	w.addLog(fmt.Sprintf("looping through %d active plugins", len(w.activePlugins)), config.LogLevelInfo)
 
 	/*
 		Take the hostname and start looping through the inventory plugins
@@ -378,7 +406,7 @@ func (w *Waitron) getMergedInventoryMachine(hostname string, mac string) (*machi
 		pm, err := p.GetMachine(hostname, mac)
 
 		if err != nil {
-			w.AddLog(fmt.Sprintf("failed to get machine from plugin: %v", err), 3)
+			w.addLog(fmt.Sprintf("failed to get machine from plugin in: %v", err), config.LogLevelInfo)
 			return nil, err
 		}
 
@@ -387,11 +415,11 @@ func (w *Waitron) getMergedInventoryMachine(hostname string, mac string) (*machi
 			if b, err := yaml.Marshal(pm); err == nil {
 				if err = yaml.Unmarshal(b, m); err != nil {
 					// Just log.  Don't let one plugin break everything.
-					w.AddLog(fmt.Sprintf("failed to unmarshal plugin data during machine merging: %v", err), 1)
+					w.addLog(fmt.Sprintf("failed to unmarshal plugin data during machine merging: %v", err), config.LogLevelError)
 					continue
 				}
 			} else {
-				w.AddLog(fmt.Sprintf("failed to marshal plugin data during machine merging: %v", err), 1)
+				w.addLog(fmt.Sprintf("failed to marshal plugin data during machine merging: %v", err), config.LogLevelError)
 				continue
 			}
 
@@ -478,7 +506,7 @@ func (w *Waitron) GetMergedMachine(hostname string, mac string, buildTypeName st
 func (w *Waitron) GetMachineStatus(hostname string) (string, error) {
 	j, _, err := w.getActiveJob(hostname, "")
 	if err != nil {
-		return "unknown", err
+		return "", err
 	}
 
 	j.RLock()
@@ -493,7 +521,7 @@ func (w *Waitron) GetMachineStatus(hostname string) (string, error) {
 func (w *Waitron) GetActiveJobStatus(token string) (string, error) {
 	j, _, err := w.getActiveJob("", token)
 	if err != nil {
-		return "unknown", err
+		return "", err
 	}
 
 	j.RLock()
@@ -512,7 +540,7 @@ func (w *Waitron) GetJobStatus(token string) (string, error) {
 	j, found := w.history.jobByToken[token]
 
 	if !found {
-		return "unknown", fmt.Errorf("job '%s' not found", token)
+		return "", fmt.Errorf("job '%s' not found", token)
 	}
 
 	j.RLock()
@@ -598,7 +626,7 @@ func (w *Waitron) getPxeConfigForUnknown(b *config.BuildType, macaddress string)
 		return PixieConfig{}, fmt.Errorf("job not found for  '%s' and _unknown_ builds not requested", macaddress)
 	}
 
-	w.AddLog("going to send _unknown_ details to unknown mac", 3)
+	w.addLog("going to send _unknown_ details to unknown mac", config.LogLevelInfo)
 
 	pixieConfig := PixieConfig{}
 
@@ -796,21 +824,21 @@ func (w *Waitron) GetJobsHistoryBlob() ([]byte, error) {
 	// Seems efficient...
 	// https://github.com/golang/go/blob/0bd308ff27822378dc2db77d6dd0ad3c15ed2e08/src/runtime/map.go#L118
 	if len(w.history.jobByToken) == 0 {
-		w.AddLog("no jobs, so returning empty job history", 3)
+		w.addLog("no jobs, so returning empty job history", config.LogLevelInfo)
 		return []byte("[]"), nil
 	}
 
 	// Each of the jobs in here needs to be RLock'ed as they are processed.
 	// I need to loop through them.  Just Marshal'ing the history isn't acceptable. :(
 
-	// This is simple but seems kind of dumb, but every suggested solution wen't crazy with marshal and unmarshal,
+	// This is simple but seems kind of dumb, but every suggested solution went crazy with marshal and unmarshal,
 	// which also seems dumb here but less simple. Did I miss something silly?
-	if time.Now().Sub(w.historyBlobLastCached).Seconds() < 20 {
-		w.AddLog("returning valid history cache", 3)
+	if w.config.HistoryCacheSeconds > 0 && int(time.Now().Sub(w.historyBlobLastCached).Seconds()) < w.config.HistoryCacheSeconds {
+		w.addLog("returning valid history cache", config.LogLevelInfo)
 		return w.historyBlobCache, nil
 	}
 
-	w.AddLog(fmt.Sprintf("rebuilding stale history blob cache of %d jobs", len(w.history.jobByToken)), 0)
+	w.addLog(fmt.Sprintf("rebuilding stale history blob cache of %d jobs", len(w.history.jobByToken)), config.LogLevelInfo)
 	w.historyBlobCache = make([]byte, 1, 256*len(w.history.jobByToken))
 	w.historyBlobCache[0] = '['
 
