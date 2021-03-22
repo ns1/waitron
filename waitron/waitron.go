@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -265,17 +266,40 @@ func (w *Waitron) checkForStaleJobs() {
 /*
 	This should ensure that even commands that spawn child processes are cleaned up correctly, along with their children.
 */
-func (w *Waitron) timedCommandOutput(timeout time.Duration, command string) (out []byte, err error) {
+func (w *Waitron) timedCommandOutput(timeout time.Duration, command string) ([]byte, error) {
 	cmd := exec.Command("bash", "-c", command)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
+	outP, err := cmd.StdoutPipe() // Set up the stdout pipe
+
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// Start the command
+	if err := cmd.Start(); err != nil {
+		return []byte{}, err
+	}
+
+	// Grab the pid now that we've started and set up the timeout function.
+	pid := cmd.Process.Pid
 	time.AfterFunc(timeout, func() {
-		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		syscall.Kill(-pid, syscall.SIGKILL)
 	})
 
-	out, err = cmd.Output()
+	out := make([]byte, 512, 512)
+	n, err := outP.Read(out)
 
-	return out, err
+	if err != nil {
+		return out, err
+	}
+
+	// Wait for the command to finish/terminate.
+	if err := cmd.Wait(); err != nil {
+		return []byte{}, err
+	}
+
+	return out[:n], nil
 }
 
 /*
@@ -308,7 +332,7 @@ func (w *Waitron) runBuildCommands(j *Job, b []config.BuildCommand) error {
 		// Now actually execute the command and return err if ErrorsFatal
 		out, err := w.timedCommandOutput(time.Duration(buildCommand.TimeoutSeconds)*time.Second, cmdline)
 
-		if err != nil && buildCommand.ErrorsFatal {
+		if err != nil && err != io.EOF && buildCommand.ErrorsFatal {
 			return errors.New(err.Error() + ":" + string(out))
 		}
 	}
@@ -333,6 +357,8 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 		If not present, then it will be set from buildType - This must happen so that when the macaddress comes in for the pxe config, we will know what to serve.
 	*/
 
+	w.addLog(fmt.Sprintf("looking for already active job for '%s'", hostname), config.LogLevelDebug)
+
 	// Error or not, if an existing job was found, no new job permitted.
 	if _, found, _ := w.getActiveJob(hostname, ""); found {
 		return "", fmt.Errorf("active job for '%s' must complete or be terminated before new job", hostname)
@@ -344,6 +370,8 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 	w.addLog(fmt.Sprintf("%s job token generated: %s", hostname, token), config.LogLevelInfo)
 
 	hostname = strings.ToLower(hostname)
+
+	w.addLog(fmt.Sprintf("retrieving complied machine details for job %s", token), config.LogLevelDebug)
 
 	// Get the compiled machine details from any config, build type, and plugins being used
 	foundMachine, err := w.GetMergedMachine(hostname, "", buildTypeName)
@@ -363,10 +391,15 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 		Token:         token,
 	}
 
+	w.addLog(fmt.Sprintf("running pre-build commands for job %s", token), config.LogLevelDebug)
+
 	// Perform any desired operations needed prior to setting build mode.
 	if err := w.runBuildCommands(j, j.Machine.PreBuildCommands); err != nil {
+		w.addLog(fmt.Sprintf("pre-build commands for %s returned errors %v", token, err), config.LogLevelDebug)
 		return "", err
 	}
+
+	w.addLog(fmt.Sprintf("normalizing macs for job %s", token), config.LogLevelDebug)
 
 	// normalize interface MAC addresses
 	macs := make([]string, 0, len(j.Machine.Network))
@@ -377,11 +410,13 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 		macs = append(macs, j.Machine.Network[i].MacAddress)
 	}
 
-	w.addLog(fmt.Sprintf("job %s added", token), config.LogLevelInfo)
+	w.addLog(fmt.Sprintf("adding job %s", token), config.LogLevelDebug)
 
 	if err = w.addJob(j, token, hostname, macs); err != nil {
 		return "", err
 	}
+
+	w.addLog(fmt.Sprintf("job %s added", token), config.LogLevelInfo)
 
 	return token, nil
 }

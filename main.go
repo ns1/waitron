@@ -167,7 +167,6 @@ func hostStatus(response http.ResponseWriter, request *http.Request, ps httprout
 	s, err := w.GetMachineStatus(hostname)
 
 	if err != nil {
-		http.Error(response, s, 500)
 		http.Error(response, fmt.Sprintf("Failed to find active job for %s. Try search by job ID. %s", hostname, err.Error()), 404)
 		return
 	}

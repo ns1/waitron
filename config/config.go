@@ -2,6 +2,7 @@ package config
 
 import (
 	"io/ioutil"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 )
@@ -17,6 +18,13 @@ const (
 
 func (l LogLevel) String() string {
 	return [...]string{"ERROR", "WARN", "INFO", "DEBUG"}[l]
+}
+
+var ll = map[string]LogLevel{
+	"ERROR": LogLevelError,
+	"WARN":  LogLevelWarning,
+	"INFO":  LogLevelInfo,
+	"DEBUG": LogLevelDebug,
 }
 
 type BuildCommand struct {
@@ -67,8 +75,9 @@ type Config struct {
 	MachineInventoryPlugins  []MachineInventoryPluginSettings `yaml:"inventory_plugins,omitempty"`
 	BuildTypes               map[string]BuildType             `yaml:"build_types,omitempty"`
 	StaleBuildCheckFrequency int                              `yaml:"stale_build_check_frequency_secs,omitempty"`
-	HistoryCacheSeconds      int                              `yaml:"history_cache_seconds"`
-	LogLevel                 LogLevel                         `yaml:"log_level"`
+	HistoryCacheSeconds      int                              `yaml:"history_cache_seconds,omitempty"`
+	LogLevelName             string                           `yaml:"log_level,omitempty"`
+	LogLevel                 LogLevel                         `yaml:"-,omitempty"`
 
 	BuildType `yaml:",inline"`
 }
@@ -87,6 +96,8 @@ func LoadConfig(configPath string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	c.LogLevel = ll[strings.ToUpper(c.LogLevelName)]
 
 	return &c, nil
 }
