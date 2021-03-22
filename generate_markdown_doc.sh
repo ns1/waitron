@@ -1,2 +1,6 @@
-go get github.com/yvasiyarov/swagger
-$GOPATH/bin/swagger -apiPackage="github.com/ns1/waitron" -mainApiFile="github.com/ns1/waitron/main.go" -format="markdown"
+go get -u github.com/swaggo/swag/cmd/swag
+go get -u github.com/go-swagger/go-swagger
+
+go build -o $GOPATH/bin/ $GOPATH/src/github.com/go-swagger/go-swagger/cmd/swagger
+$GOPATH/bin/swag init
+$GOPATH/bin/swagger generate markdown -f docs/swagger.json --output swagger.mode

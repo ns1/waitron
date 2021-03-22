@@ -31,7 +31,7 @@ type result struct {
 // @Param type    	path    string    true    "Build Type"
 // @Success 200    {object} string "Machine config in JSON format."
 // @Failure 404    {object} string "Machine not found"
-// @Router /definition/{hostname}/{buildType} [GET]
+// @Router /definition/{hostname}/{type} [GET]
 func definitionHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
 	hostname := ps.ByName("hostname")
@@ -92,7 +92,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request, ps htt
 // @Param type        path    string    true    "Build Type"
 // @Success 200    {object} string "{"State": "OK", "Token": <UUID of the build>}"
 // @Failure 500    {object} string "Failed to set build mode on hostname"
-// @Router build/{hostname}/{type} [PUT]
+// @Router /build/{hostname}/{type} [PUT]
 func buildHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
 	hostname := ps.ByName("hostname")

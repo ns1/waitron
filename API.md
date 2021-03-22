@@ -1,375 +1,509 @@
 
+
+
 # Waitron
-Templates for server provisioning
+  
 
-Table of Contents
+## Informations
 
-1. [Put the server in build mode](#build)
-1. [Removes the server from build mode and runs post-build commands related to requested build terminations.](#cancel)
-1. [Removes the server from build mode and runs post-build comands related to normal install completion.](#done)
-1. [health](#health)
-1. [List machines handled by waitron](#list)
-1. [Build status of the server](#status)
-1. [Renders either the finish or the preseed template](#template)
-1. [Dictionary with kernel, intrd(s) and commandline for pixiecore](#v1)
+### Version
 
-<a name="build"></a>
+2.0
 
-## build
+### Contact
 
-| Specification | Value |
-|-----|-----|
-| Resource Path | /build |
-| API Version |  |
-| BasePath for the API | {{.}} |
-| Consumes |  |
-| Produces |  |
+  
 
+## Content negotiation
 
+### URI Schemes
+  * http
 
-### Operations
+### Consumes
+  * application/json
 
+### Produces
+  * application/json
 
-| Resource Path | Operation | Description |
-|-----|-----|-----|
-| build/\{hostname\} | [PUT](#buildHandler) | Put the server in build mode |
+## All endpoints
 
+###  operations
 
+| Method  | URI     | Name   | Summary |
+|---------|---------|--------|---------|
+| GET | /cancel/{hostname}/{token} | [get cancel hostname token](#get-cancel-hostname-token) |  |
+| GET | /cleanhistory | [get cleanhistory](#get-cleanhistory) |  |
+| GET | /definition/{hostname}/{type} | [get definition hostname type](#get-definition-hostname-type) |  |
+| GET | /done/{hostname}/{token} | [get done hostname token](#get-done-hostname-token) |  |
+| GET | /health | [get health](#get-health) |  |
+| GET | /job/{token} | [get job token](#get-job-token) |  |
+| GET | /status | [get status](#get-status) |  |
+| GET | /status/{hostname} | [get status hostname](#get-status-hostname) |  |
+| GET | /template/{template}/{hostname}/{token} | [get template template hostname token](#get-template-template-hostname-token) |  |
+| GET | /v1/boot/{macaddr} | [get v1 boot macaddr](#get-v1-boot-macaddr) |  |
+| PUT | /build/{hostname}/{type} | [put build hostname type](#put-build-hostname-type) |  |
+  
 
-<a name="buildHandler"></a>
 
-#### API: build/\{hostname\} (PUT)
+## Paths
 
+### <span id="get-cancel-hostname-token"></span> get cancel hostname token (*GetCancelHostnameToken*)
 
-Put the server in build mode
+```
+GET /cancel/{hostname}/{token}
+```
 
+Remove the server from build mode
 
+#### Parameters
 
-| Param Name | Param Type | Data Type | Description | Required? |
-|-----|-----|-----|-----|-----|
-| hostname | path | string | Hostname | Yes |
+| Name | Source | Type | Go type | Separator | Required | Default | Description |
+|------|--------|------|---------|-----------| :------: |---------|-------------|
+| hostname | `path` | string | `string` |  | ✓ |  | Hostname |
+| token | `path` | string | `string` |  | ✓ |  | Token |
 
+#### All responses
+| Code | Status | Description | Has headers | Schema |
+|------|--------|-------------|:-----------:|--------|
+| [200](#get-cancel-hostname-token-200) | OK | {"State": "OK"} |  | [schema](#get-cancel-hostname-token-200-schema) |
+| [400](#get-cancel-hostname-token-400) | Bad Request | Not in build mode or definition does not exist |  | [schema](#get-cancel-hostname-token-400-schema) |
+| [401](#get-cancel-hostname-token-401) | Unauthorized | Invalid token |  | [schema](#get-cancel-hostname-token-401-schema) |
+| [500](#get-cancel-hostname-token-500) | Internal Server Error | Failed to cancel build mode |  | [schema](#get-cancel-hostname-token-500-schema) |
 
-| Code | Type | Model | Message |
-|-----|-----|-----|-----|
-| 200 | object | string | {"State": "OK", "Token": <UUID of the build>} |
-| 500 | object | string | Unable to find host definition for hostname |
-| 500 | object | string | Failed to set build mode on hostname |
+#### Responses
 
 
-<a name="cancel"></a>
+##### <span id="get-cancel-hostname-token-200"></span> 200 - {"State": "OK"}
+Status: OK
 
-## cancel
+###### <span id="get-cancel-hostname-token-200-schema"></span> Schema
+   
+  
 
-| Specification | Value |
-|-----|-----|
-| Resource Path | /cancel |
-| API Version |  |
-| BasePath for the API | {{.}} |
-| Consumes |  |
-| Produces |  |
 
 
+##### <span id="get-cancel-hostname-token-400"></span> 400 - Not in build mode or definition does not exist
+Status: Bad Request
 
-### Operations
+###### <span id="get-cancel-hostname-token-400-schema"></span> Schema
+   
+  
 
 
-| Resource Path | Operation | Description |
-|-----|-----|-----|
-| /cancel/\{hostname\}/\{token\} | [GET](#cancelHandler) | Removes the server from build mode and runs post-build commands related to requested build terminations. |
 
+##### <span id="get-cancel-hostname-token-401"></span> 401 - Invalid token
+Status: Unauthorized
 
+###### <span id="get-cancel-hostname-token-401-schema"></span> Schema
+   
+  
 
-<a name="cancelHandler"></a>
 
-#### API: /cancel/\{hostname\}/\{token\} (GET)
 
+##### <span id="get-cancel-hostname-token-500"></span> 500 - Failed to cancel build mode
+Status: Internal Server Error
 
-Removes the server from build mode and runs post-build commands related to requested build terminations.
+###### <span id="get-cancel-hostname-token-500-schema"></span> Schema
+   
+  
 
 
 
-| Param Name | Param Type | Data Type | Description | Required? |
-|-----|-----|-----|-----|-----|
-| hostname | path | string | Hostname | Yes |
-| token | path | string | Token | Yes |
+### <span id="get-cleanhistory"></span> get cleanhistory (*GetCleanhistory*)
 
+```
+GET /cleanhistory
+```
 
-| Code | Type | Model | Message |
-|-----|-----|-----|-----|
-| 200 | object | string | {"State": "OK"} |
-| 500 | object | string | Failed to cancel build mode |
-| 400 | object | string | Not in build mode or definition does not exist |
-| 401 | object | string | Invalid token |
+Clear all completed jobs from the in-memory history of Waitron
 
+#### All responses
+| Code | Status | Description | Has headers | Schema |
+|------|--------|-------------|:-----------:|--------|
+| [200](#get-cleanhistory-200) | OK | {"State": "OK"} |  | [schema](#get-cleanhistory-200-schema) |
+| [500](#get-cleanhistory-500) | Internal Server Error | Failed to clean history |  | [schema](#get-cleanhistory-500-schema) |
 
-<a name="done"></a>
+#### Responses
 
-## done
 
-| Specification | Value |
-|-----|-----|
-| Resource Path | /done |
-| API Version |  |
-| BasePath for the API | {{.}} |
-| Consumes |  |
-| Produces |  |
+##### <span id="get-cleanhistory-200"></span> 200 - {"State": "OK"}
+Status: OK
 
+###### <span id="get-cleanhistory-200-schema"></span> Schema
+   
+  
 
 
-### Operations
 
+##### <span id="get-cleanhistory-500"></span> 500 - Failed to clean history
+Status: Internal Server Error
 
-| Resource Path | Operation | Description |
-|-----|-----|-----|
-| /done/\{hostname\}/\{token\} | [GET](#doneHandler) | Removes the server from build mode and runs post-build comands related to normal install completion. |
+###### <span id="get-cleanhistory-500-schema"></span> Schema
+   
+  
 
 
 
-<a name="doneHandler"></a>
+### <span id="get-definition-hostname-type"></span> get definition hostname type (*GetDefinitionHostnameType*)
 
-#### API: /done/\{hostname\}/\{token\} (GET)
+```
+GET /definition/{hostname}/{type}
+```
 
+Return the waitron configuration details for a machine
 
-Removes the server from build mode and runs post-build comands related to normal install completion.
+#### Parameters
 
+| Name | Source | Type | Go type | Separator | Required | Default | Description |
+|------|--------|------|---------|-----------| :------: |---------|-------------|
+| hostname | `path` | string | `string` |  | ✓ |  | Hostname |
+| type | `path` | string | `string` |  | ✓ |  | Build Type |
 
+#### All responses
+| Code | Status | Description | Has headers | Schema |
+|------|--------|-------------|:-----------:|--------|
+| [200](#get-definition-hostname-type-200) | OK | Machine config in JSON format. |  | [schema](#get-definition-hostname-type-200-schema) |
+| [404](#get-definition-hostname-type-404) | Not Found | Machine not found |  | [schema](#get-definition-hostname-type-404-schema) |
 
-| Param Name | Param Type | Data Type | Description | Required? |
-|-----|-----|-----|-----|-----|
-| hostname | path | string | Hostname | Yes |
-| token | path | string | Token | Yes |
+#### Responses
 
 
-| Code | Type | Model | Message |
-|-----|-----|-----|-----|
-| 200 | object | string | {"State": "OK"} |
-| 500 | object | string | Failed to finish build mode |
-| 400 | object | string | Not in build mode or definition does not exist |
-| 401 | object | string | Invalid token |
+##### <span id="get-definition-hostname-type-200"></span> 200 - Machine config in JSON format.
+Status: OK
 
+###### <span id="get-definition-hostname-type-200-schema"></span> Schema
+   
+  
 
-<a name="health"></a>
 
-## health
 
-| Specification | Value |
-|-----|-----|
-| Resource Path | /health |
-| API Version |  |
-| BasePath for the API | {{.}} |
-| Consumes |  |
-| Produces |  |
+##### <span id="get-definition-hostname-type-404"></span> 404 - Machine not found
+Status: Not Found
 
+###### <span id="get-definition-hostname-type-404-schema"></span> Schema
+   
+  
 
 
-### Operations
 
+### <span id="get-done-hostname-token"></span> get done hostname token (*GetDoneHostnameToken*)
 
-| Resource Path | Operation | Description |
-|-----|-----|-----|
-| /health | [GET](#healthHandler) |  |
+```
+GET /done/{hostname}/{token}
+```
 
+Remove the server from build mode
 
+#### Parameters
 
-<a name="healthHandler"></a>
+| Name | Source | Type | Go type | Separator | Required | Default | Description |
+|------|--------|------|---------|-----------| :------: |---------|-------------|
+| hostname | `path` | string | `string` |  | ✓ |  | Hostname |
+| token | `path` | string | `string` |  | ✓ |  | Token |
 
-#### API: /health (GET)
+#### All responses
+| Code | Status | Description | Has headers | Schema |
+|------|--------|-------------|:-----------:|--------|
+| [200](#get-done-hostname-token-200) | OK | {"State": "OK"} |  | [schema](#get-done-hostname-token-200-schema) |
+| [400](#get-done-hostname-token-400) | Bad Request | Not in build mode or definition does not exist |  | [schema](#get-done-hostname-token-400-schema) |
+| [401](#get-done-hostname-token-401) | Unauthorized | Invalid token |  | [schema](#get-done-hostname-token-401-schema) |
+| [500](#get-done-hostname-token-500) | Internal Server Error | Failed to finish build mode |  | [schema](#get-done-hostname-token-500-schema) |
 
+#### Responses
 
 
+##### <span id="get-done-hostname-token-200"></span> 200 - {"State": "OK"}
+Status: OK
 
+###### <span id="get-done-hostname-token-200-schema"></span> Schema
+   
+  
 
 
-| Code | Type | Model | Message |
-|-----|-----|-----|-----|
-| 200 | object | string | {"State": "OK"} |
 
+##### <span id="get-done-hostname-token-400"></span> 400 - Not in build mode or definition does not exist
+Status: Bad Request
 
-<a name="list"></a>
+###### <span id="get-done-hostname-token-400-schema"></span> Schema
+   
+  
 
-## list
 
-| Specification | Value |
-|-----|-----|
-| Resource Path | /list |
-| API Version |  |
-| BasePath for the API | {{.}} |
-| Consumes |  |
-| Produces |  |
 
+##### <span id="get-done-hostname-token-401"></span> 401 - Invalid token
+Status: Unauthorized
 
+###### <span id="get-done-hostname-token-401-schema"></span> Schema
+   
+  
 
-### Operations
 
 
-| Resource Path | Operation | Description |
-|-----|-----|-----|
-| /list | [GET](#listMachinesHandler) | List machines handled by waitron |
+##### <span id="get-done-hostname-token-500"></span> 500 - Failed to finish build mode
+Status: Internal Server Error
 
+###### <span id="get-done-hostname-token-500-schema"></span> Schema
+   
+  
 
 
-<a name="listMachinesHandler"></a>
 
-#### API: /list (GET)
+### <span id="get-health"></span> get health (*GetHealth*)
 
+```
+GET /health
+```
 
-List machines handled by waitron
+Check that Waitron is running
 
+#### All responses
+| Code | Status | Description | Has headers | Schema |
+|------|--------|-------------|:-----------:|--------|
+| [200](#get-health-200) | OK | {"State": "OK"} |  | [schema](#get-health-200-schema) |
 
+#### Responses
 
-| Code | Type | Model | Message |
-|-----|-----|-----|-----|
-| 200 | array | string | List of machines |
-| 500 | object | string | Unable to list machines |
 
+##### <span id="get-health-200"></span> 200 - {"State": "OK"}
+Status: OK
 
-<a name="status"></a>
+###### <span id="get-health-200-schema"></span> Schema
+   
+  
 
-## status
 
-| Specification | Value |
-|-----|-----|
-| Resource Path | /status |
-| API Version |  |
-| BasePath for the API | {{.}} |
-| Consumes |  |
-| Produces |  |
 
+### <span id="get-job-token"></span> get job token (*GetJobToken*)
 
+```
+GET /job/{token}
+```
 
-### Operations
+Return details for the specified job token
 
+#### Parameters
 
-| Resource Path | Operation | Description |
-|-----|-----|-----|
-| /status/\{hostname\} | [GET](#hostStatus) | Build status of the server |
-| /status | [GET](#status) | Dictionary with machines and its status |
+| Name | Source | Type | Go type | Separator | Required | Default | Description |
+|------|--------|------|---------|-----------| :------: |---------|-------------|
+| token | `path` | string | `string` |  | ✓ |  | Token |
 
+#### All responses
+| Code | Status | Description | Has headers | Schema |
+|------|--------|-------------|:-----------:|--------|
+| [200](#get-job-token-200) | OK | Job details in JSON format. |  | [schema](#get-job-token-200-schema) |
+| [404](#get-job-token-404) | Not Found | Job not found |  | [schema](#get-job-token-404-schema) |
 
+#### Responses
 
-<a name="hostStatus"></a>
 
-#### API: /status/\{hostname\} (GET)
+##### <span id="get-job-token-200"></span> 200 - Job details in JSON format.
+Status: OK
 
+###### <span id="get-job-token-200-schema"></span> Schema
+   
+  
+
+
+
+##### <span id="get-job-token-404"></span> 404 - Job not found
+Status: Not Found
+
+###### <span id="get-job-token-404-schema"></span> Schema
+   
+  
+
+
+
+### <span id="get-status"></span> get status (*GetStatus*)
+
+```
+GET /status
+```
+
+Dictionary with jobs and status
+
+#### All responses
+| Code | Status | Description | Has headers | Schema |
+|------|--------|-------------|:-----------:|--------|
+| [200](#get-status-200) | OK | Dictionary with jobs and status |  | [schema](#get-status-200-schema) |
+
+#### Responses
+
+
+##### <span id="get-status-200"></span> 200 - Dictionary with jobs and status
+Status: OK
+
+###### <span id="get-status-200-schema"></span> Schema
+   
+  
+
+
+
+### <span id="get-status-hostname"></span> get status hostname (*GetStatusHostname*)
+
+```
+GET /status/{hostname}
+```
 
 Build status of the server
 
+#### Parameters
+
+| Name | Source | Type | Go type | Separator | Required | Default | Description |
+|------|--------|------|---------|-----------| :------: |---------|-------------|
+| hostname | `path` | string | `string` |  | ✓ |  | Hostname |
+
+#### All responses
+| Code | Status | Description | Has headers | Schema |
+|------|--------|-------------|:-----------:|--------|
+| [200](#get-status-hostname-200) | OK | The status: (installing or installed) |  | [schema](#get-status-hostname-200-schema) |
+| [404](#get-status-hostname-404) | Not Found | Failed to find active job for host |  | [schema](#get-status-hostname-404-schema) |
+
+#### Responses
 
 
-| Param Name | Param Type | Data Type | Description | Required? |
-|-----|-----|-----|-----|-----|
-| hostname | path | string | Hostname | Yes |
+##### <span id="get-status-hostname-200"></span> 200 - The status: (installing or installed)
+Status: OK
 
-
-| Code | Type | Model | Message |
-|-----|-----|-----|-----|
-| 200 | object | string | The status: (installing or installed) |
-| 500 | object | string | Unknown state |
-
-
-<a name="status"></a>
-
-#### API: /status (GET)
-
-
-Dictionary with machines and its status
-
-
-
-| Code | Type | Model | Message |
-|-----|-----|-----|-----|
-| 200 | object | string | Dictionary with machines and its status |
-
-
-<a name="template"></a>
-
-## template
-
-| Specification | Value |
-|-----|-----|
-| Resource Path | /template |
-| API Version |  |
-| BasePath for the API | {{.}} |
-| Consumes |  |
-| Produces |  |
+###### <span id="get-status-hostname-200-schema"></span> Schema
+   
+  
 
 
 
-### Operations
+##### <span id="get-status-hostname-404"></span> 404 - Failed to find active job for host
+Status: Not Found
 
-
-| Resource Path | Operation | Description |
-|-----|-----|-----|
-| /template/\{template\}/\{hostname\}/\{token\} | [GET](#templateHandler) | Renders either the finish or the preseed template |
-
-
-
-<a name="templateHandler"></a>
-
-#### API: /template/\{template\}/\{hostname\}/\{token\} (GET)
-
-
-Renders either the finish or the preseed template
+###### <span id="get-status-hostname-404-schema"></span> Schema
+   
+  
 
 
 
-| Param Name | Param Type | Data Type | Description | Required? |
-|-----|-----|-----|-----|-----|
-| hostname | path | string | Hostname | Yes |
-| template | path | string | The template to be rendered | Yes |
-| token | path | string | Token | Yes |
+### <span id="get-template-template-hostname-token"></span> get template template hostname token (*GetTemplateTemplateHostnameToken*)
+
+```
+GET /template/{template}/{hostname}/{token}
+```
+
+Render either the finish or the preseed template
+
+#### Parameters
+
+| Name | Source | Type | Go type | Separator | Required | Default | Description |
+|------|--------|------|---------|-----------| :------: |---------|-------------|
+| hostname | `path` | string | `string` |  | ✓ |  | Hostname |
+| template | `path` | string | `string` |  | ✓ |  | The template to be rendered |
+| token | `path` | string | `string` |  | ✓ |  | Token |
+
+#### All responses
+| Code | Status | Description | Has headers | Schema |
+|------|--------|-------------|:-----------:|--------|
+| [200](#get-template-template-hostname-token-200) | OK | Rendered template |  | [schema](#get-template-template-hostname-token-200-schema) |
+| [400](#get-template-template-hostname-token-400) | Bad Request | Unable to render template |  | [schema](#get-template-template-hostname-token-400-schema) |
+
+#### Responses
 
 
-| Code | Type | Model | Message |
-|-----|-----|-----|-----|
-| 200 | object | string | Rendered template |
-| 400 | object | string | Not in build mode or definition does not exist |
-| 400 | object | string | Unable to render template |
-| 401 | object | string | Invalid token |
+##### <span id="get-template-template-hostname-token-200"></span> 200 - Rendered template
+Status: OK
 
-
-<a name="v1"></a>
-
-## v1
-
-| Specification | Value |
-|-----|-----|
-| Resource Path | /v1 |
-| API Version |  |
-| BasePath for the API | {{.}} |
-| Consumes |  |
-| Produces |  |
-
-
-
-### Operations
-
-
-| Resource Path | Operation | Description |
-|-----|-----|-----|
-| /v1/boot/\{macaddr\} | [GET](#pixieHandler) | Dictionary with kernel, intrd(s) and commandline for pixiecore |
+###### <span id="get-template-template-hostname-token-200-schema"></span> Schema
+   
+  
 
 
 
-<a name="pixieHandler"></a>
+##### <span id="get-template-template-hostname-token-400"></span> 400 - Unable to render template
+Status: Bad Request
 
-#### API: /v1/boot/\{macaddr\} (GET)
+###### <span id="get-template-template-hostname-token-400-schema"></span> Schema
+   
+  
 
+
+
+### <span id="get-v1-boot-macaddr"></span> get v1 boot macaddr (*GetV1BootMacaddr*)
+
+```
+GET /v1/boot/{macaddr}
+```
 
 Dictionary with kernel, intrd(s) and commandline for pixiecore
 
+#### Parameters
+
+| Name | Source | Type | Go type | Separator | Required | Default | Description |
+|------|--------|------|---------|-----------| :------: |---------|-------------|
+| macaddr | `path` | string | `string` |  | ✓ |  | MacAddress |
+
+#### All responses
+| Code | Status | Description | Has headers | Schema |
+|------|--------|-------------|:-----------:|--------|
+| [200](#get-v1-boot-macaddr-200) | OK | Dictionary with kernel, intrd(s) and commandline for pixiecore |  | [schema](#get-v1-boot-macaddr-200-schema) |
+| [500](#get-v1-boot-macaddr-500) | Internal Server Error | failed to get pxe config |  | [schema](#get-v1-boot-macaddr-500-schema) |
+
+#### Responses
 
 
-| Param Name | Param Type | Data Type | Description | Required? |
-|-----|-----|-----|-----|-----|
-| macaddr | path | string | MacAddress | Yes |
+##### <span id="get-v1-boot-macaddr-200"></span> 200 - Dictionary with kernel, intrd(s) and commandline for pixiecore
+Status: OK
+
+###### <span id="get-v1-boot-macaddr-200-schema"></span> Schema
+   
+  
 
 
-| Code | Type | Model | Message |
-|-----|-----|-----|-----|
-| 200 | object | string | Dictionary with kernel, intrd(s) and commandline for pixiecore |
-| 404 | object | string | Not in build mode |
-| 500 | object | string | Unable to find host definition for hostname |
+
+##### <span id="get-v1-boot-macaddr-500"></span> 500 - failed to get pxe config
+Status: Internal Server Error
+
+###### <span id="get-v1-boot-macaddr-500-schema"></span> Schema
+   
+  
 
 
+
+### <span id="put-build-hostname-type"></span> put build hostname type (*PutBuildHostnameType*)
+
+```
+PUT /build/{hostname}/{type}
+```
+
+Put the server in build mode
+
+#### Parameters
+
+| Name | Source | Type | Go type | Separator | Required | Default | Description |
+|------|--------|------|---------|-----------| :------: |---------|-------------|
+| hostname | `path` | string | `string` |  | ✓ |  | Hostname |
+| type | `path` | string | `string` |  | ✓ |  | Build Type |
+
+#### All responses
+| Code | Status | Description | Has headers | Schema |
+|------|--------|-------------|:-----------:|--------|
+| [200](#put-build-hostname-type-200) | OK | {"State": "OK", "Token": <UUID of the build>} |  | [schema](#put-build-hostname-type-200-schema) |
+| [500](#put-build-hostname-type-500) | Internal Server Error | Failed to set build mode on hostname |  | [schema](#put-build-hostname-type-500-schema) |
+
+#### Responses
+
+
+##### <span id="put-build-hostname-type-200"></span> 200 - {"State": "OK", "Token": <UUID of the build>}
+Status: OK
+
+###### <span id="put-build-hostname-type-200-schema"></span> Schema
+   
+  
+
+
+
+##### <span id="put-build-hostname-type-500"></span> 500 - Failed to set build mode on hostname
+Status: Internal Server Error
+
+###### <span id="put-build-hostname-type-500-schema"></span> Schema
+   
+  
+
+
+
+## Models
