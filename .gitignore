@@ -1,4 +1,5 @@
-waitron
+/bin/
+/docs/
 vp
 vendor
 go.sum

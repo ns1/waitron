@@ -1,20 +1,23 @@
 package main
 
-// @APITitle Waitron
-// @APIDescription Templates for server provisioning
+// @Title Waitron
+// @Version 2
+// @Description Endpoints for server provisioning
 // @License BSD
 // @LicenseUrl http://opensource.org/licenses/BSD-2-Clause
 import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/gorilla/handlers"
-	"github.com/julienschmidt/httprouter"
 	"log"
 	"net/http"
 	"os"
-	"sync"
-	"time"
+
+	"waitron/config"
+	"waitron/waitron"
+
+	"github.com/gorilla/handlers"
+	"github.com/julienschmidt/httprouter"
 )
 
 type result struct {
@@ -25,18 +28,20 @@ type result struct {
 
 // @Title definitionHandler
 // @Description Return the waitron configuration details for a machine
-// @Param hostname    path    string    true    "Hostname"
+// @Summary Return the waitron configuration details for a machine.  Note that "build type" is technically not required, depending on your config.
+// @Param hostname  path    string    true    "Hostname"
+// @Param type    	path    string    true    "Build Type"
 // @Success 200    {object} string "Machine config in JSON format."
 // @Failure 404    {object} string "Machine not found"
-// @Router /definition/{hostname} [GET]
-func definitionHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, config Config, state State) {
+// @Router /definition/{hostname}/{type} [GET]
+func definitionHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
 	hostname := ps.ByName("hostname")
+	btype := ps.ByName("type")
 
-	m, err := machineDefinition(hostname, config.MachinePath, config)
-	if err != nil {
-		log.Println(err)
-		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 404)
+	m, err := w.GetMergedMachine(hostname, "", btype)
+	if err != nil || m == nil {
+		http.Error(response, fmt.Sprintf("Unable to find host definition for '%s' '%s'. %s", hostname, btype, err.Error()), 404)
 		return
 	}
 
@@ -45,48 +50,41 @@ func definitionHandler(response http.ResponseWriter, request *http.Request, ps h
 	fmt.Fprintf(response, string(result))
 }
 
+// @Title jobDefinitionHandler
+// @Description Return details for the specified job token
+// @Summary Return details for the specified job token
+// @Param token    path    string    true    "Token"
+// @Success 200    {object} string "Job details in JSON format."
+// @Failure 404    {object} string "Job not found"
+// @Router /job/{token} [GET]
+func jobDefinitionHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
+
+	token := ps.ByName("token")
+
+	jb, err := w.GetJobBlob(token)
+	if err != nil {
+		http.Error(response, fmt.Sprintf("Unable to find valid job for %s. %s", token, err.Error()), 404)
+		return
+	}
+
+	response.Write(jb)
+}
+
 // @Title templateHandler
 // @Description Render either the finish or the preseed template
+// @Summary Render either the finish or the preseed template
 // @Param hostname    path    string    true    "Hostname"
 // @Param template    path    string    true    "The template to be rendered"
 // @Param token        path    string    true    "Token"
 // @Success 200    {object} string "Rendered template"
-// @Failure 400    {object} string "Not in build mode or definition does not exist"
 // @Failure 400    {object} string "Unable to render template"
-// @Failure 401    {object} string "Invalid token"
 // @Router /template/{template}/{hostname}/{token} [GET]
-func templateHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, config Config, state State) {
+func templateHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
-	hostname := ps.ByName("hostname")
+	/* This eventually should to change to a PUT/POST because it causes changes. */
 
-	if ps.ByName("token") != state.Tokens[hostname] {
-		http.Error(response, "Invalid Token", 401)
-		log.Println(ps.ByName("token"))
-		return
-	}
-
-	// Get machine
-	state.Mux.Lock()
-	m, found := state.MachineByUUID[ps.ByName("token")]
-	state.Mux.Unlock()
-
-	if !found {
-		http.Error(response, "Not in build mode or definition does not exist", 400)
-		log.Println(m)
-		return
-	}
-
-	// Render preseed as default
-	var template string
-	if ps.ByName("template") == "finish" {
-		template = m.Finish
-	} else {
-		template = m.Preseed
-	}
-
-	renderedTemplate, err := m.renderTemplate(template, config)
+	renderedTemplate, err := w.RenderStageTemplate(ps.ByName("token"), ps.ByName("template"))
 	if err != nil {
-		log.Println(err)
 		http.Error(response, "Unable to render template", 400)
 		return
 	}
@@ -96,58 +94,20 @@ func templateHandler(response http.ResponseWriter, request *http.Request, ps htt
 
 // @Title buildHandler
 // @Description Put the server in build mode
+// @Summary Put the server in build mode
 // @Param hostname    path    string    true    "Hostname"
+// @Param type        path    string    true    "Build Type"
 // @Success 200    {object} string "{"State": "OK", "Token": <UUID of the build>}"
-// @Failure 500    {object} string "Unable to find host definition for hostname"
 // @Failure 500    {object} string "Failed to set build mode on hostname"
-// @Router build/{hostname} [PUT]
-func buildHandler(response http.ResponseWriter, request *http.Request,
-	ps httprouter.Params, config Config, state State) {
+// @Router /build/{hostname}/{type} [PUT]
+func buildHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
+
 	hostname := ps.ByName("hostname")
+	btype := ps.ByName("type")
 
-	m, err := machineDefinition(hostname, config.MachinePath, config)
+	token, err := w.Build(hostname, btype)
 	if err != nil {
-		log.Println(err)
-		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 500)
-		return
-	}
-
-	token, err := m.setBuildMode(config, state)
-	if err != nil {
-		log.Println(err)
-		http.Error(response, fmt.Sprintf("Failed to set build mode on %s", hostname), 500)
-		return
-	}
-
-	result, _ := json.Marshal(&result{State: "OK", Token: token})
-
-	fmt.Fprintf(response, string(result))
-}
-
-// @Title rescueHandler
-// @Description Put the server in build mode for a rescue boot
-// @Param hostname    path    string    true    "Hostname"
-// @Success 200    {object} string "{"State": "OK", "Token": <UUID of the build>}"
-// @Failure 500    {object} string "Unable to find host definition for hostname"
-// @Failure 500    {object} string "Failed to set build mode for rescue on hostname"
-// @Router rescue/{hostname} [PUT]
-func rescueHandler(response http.ResponseWriter, request *http.Request,
-	ps httprouter.Params, config Config, state State) {
-	hostname := ps.ByName("hostname")
-
-	m, err := machineDefinition(hostname, config.MachinePath, config)
-	if err != nil {
-		log.Println(err)
-		http.Error(response, fmt.Sprintf("Unable to find host definition for %s", hostname), 500)
-		return
-	}
-
-	m.RescueMode = true
-
-	token, err := m.setBuildMode(config, state)
-	if err != nil {
-		log.Println(err)
-		http.Error(response, fmt.Sprintf("Failed to set build mode for rescue on %s", hostname), 500)
+		http.Error(response, fmt.Sprintf("Failed to set build mode for %s - %s: %s", hostname, btype, err.Error()), 500)
 		return
 	}
 
@@ -158,36 +118,20 @@ func rescueHandler(response http.ResponseWriter, request *http.Request,
 
 // @Title doneHandler
 // @Description Remove the server from build mode
+// @Summary Remove the server from build mode
 // @Param hostname    path    string    true    "Hostname"
 // @Param token        path    string    true    "Token"
 // @Success 200    {object} string "{"State": "OK"}"
 // @Failure 500    {object} string "Failed to finish build mode"
-// @Failure 400    {object} string "Not in build mode or definition does not exist"
-// @Failure 401    {object} string "Invalid token"
 // @Router /done/{hostname}/{token} [GET]
-func doneHandler(response http.ResponseWriter, request *http.Request,
-	ps httprouter.Params, config Config, state State) {
-	hostname := ps.ByName("hostname")
+func doneHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
-	if ps.ByName("token") != state.Tokens[hostname] {
-		http.Error(response, "Invalid Token", 401)
-		return
-	}
+	/* This eventually should to change to a PUT/POST because it causes changes. */
 
-	// Get machine
-	state.Mux.Lock()
-	m, found := state.MachineByUUID[ps.ByName("token")]
-	state.Mux.Unlock()
+	err := w.FinishBuild(ps.ByName("hostname"), ps.ByName("token"))
 
-	if !found {
-		http.Error(response, "Not in build mode or definition does not exist", 400)
-		return
-	}
-
-	err := m.doneBuildMode(config, state)
 	if err != nil {
-		log.Println(err)
-		http.Error(response, "Failed to finish build mode", 500)
+		http.Error(response, "Failed to finish build.", 500)
 		return
 	}
 
@@ -198,35 +142,19 @@ func doneHandler(response http.ResponseWriter, request *http.Request,
 
 // @Title cancelHandler
 // @Description Remove the server from build mode
+// @Summary Remove the server from build mode
 // @Param hostname    path    string    true    "Hostname"
 // @Param token        path    string    true    "Token"
 // @Success 200    {object} string "{"State": "OK"}"
 // @Failure 500    {object} string "Failed to cancel build mode"
-// @Failure 400    {object} string "Not in build mode or definition does not exist"
-// @Failure 401    {object} string "Invalid token"
-// @Router /cancel/{hostname}/{token} [GET]
-func cancelHandler(response http.ResponseWriter, request *http.Request,
-	ps httprouter.Params, config Config, state State) {
-	hostname := ps.ByName("hostname")
+// @Router /cancel/{hostname}/{token} [PUT]
+func cancelHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
-	if ps.ByName("token") != state.Tokens[hostname] {
-		http.Error(response, "Invalid Token", 401)
-		return
-	}
+	/* This eventually should to change to a PUT/POST because it causes changes. */
 
-	// Get machine
-	state.Mux.Lock()
-	m, found := state.MachineByUUID[ps.ByName("token")]
-	state.Mux.Unlock()
+	err := w.CancelBuild(ps.ByName("hostname"), ps.ByName("token"))
 
-	if !found {
-		http.Error(response, "Not in build mode or definition does not exist", 400)
-		return
-	}
-
-	err := m.cancelBuildMode(config, state)
 	if err != nil {
-		log.Println(err)
 		http.Error(response, "Failed to cancel build mode", 500)
 		return
 	}
@@ -238,117 +166,95 @@ func cancelHandler(response http.ResponseWriter, request *http.Request,
 
 // @Title hostStatus
 // @Description Build status of the server
+// @Summary Build status of the server
 // @Param hostname    path    string    true    "Hostname"
 // @Success 200    {object} string "The status: (installing or installed)"
-// @Failure 500    {object} string "Unknown state"
+// @Failure 404    {object} string "Failed to find active job for host"
 // @Router /status/{hostname} [GET]
-func hostStatus(response http.ResponseWriter, request *http.Request,
-	ps httprouter.Params, config Config, state State) {
-	m, found := state.MachineByHostname[ps.ByName("hostname")]
-	if !found || m.Status == "" {
-		http.Error(response, "Unknown state", 500)
-		return
-	}
-	fmt.Fprintf(response, m.Status)
-}
+func hostStatus(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
-// @Title listMachinesHandler
-// @Description List machines handled by waitron
-// @Success 200    {array} string "List of machines"
-// @Failure 500    {object} string "Unable to list machines"
-// @Router /list [GET]
-func listMachinesHandler(response http.ResponseWriter, request *http.Request,
-	_ httprouter.Params, config Config, state State) {
-	machines, err := config.listMachines()
+	hostname := ps.ByName("hostname")
+	s, err := w.GetMachineStatus(hostname)
+
 	if err != nil {
-		log.Println(err)
-		http.Error(response, "Unable to list machines", 500)
+		http.Error(response, fmt.Sprintf("Failed to find active job for %s. Try search by job ID. %s", hostname, err.Error()), 404)
 		return
 	}
-	result, _ := json.Marshal(machines)
-	response.Write(result)
+	fmt.Fprintf(response, s)
 }
 
 // @Title status
-// @Description Dictionary with machines and its status
-// @Success 200    {object} string "Dictionary with machines and its status"
+// @Description Dictionary with jobs and status
+// @Summary Dictionary with jobs and status
+// @Success 200    {object} string "Dictionary with jobs and status"
+// @Success 500    {object} string "The error encountered"
 // @Router /status [GET]
-func status(response http.ResponseWriter, request *http.Request,
-	ps httprouter.Params, config Config, state State) {
-	result, _ := json.Marshal(&state.MachineByHostname)
+func status(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
+	result, err := w.GetJobsHistoryBlob()
+	if err != nil {
+		http.Error(response, err.Error(), 500)
+		return
+	}
+	response.Write(result)
+}
+
+// @Title cleanHistory
+// @Description Clear all completed jobs from the in-memory history of Waitron
+// @Summary Clear all completed jobs from the in-memory history of Waitron
+// @Success 200    {object} string "{"State": "OK"}"
+// @Failure 500    {object} string "Failed to clean history"
+// @Router /cleanhistory [PUT]
+func cleanHistory(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
+	err := w.CleanHistory()
+	if err != nil {
+		http.Error(response, "Failed to clean history", 500)
+		return
+	}
+	result, _ := json.Marshal(&result{State: "OK"})
+
 	response.Write(result)
 }
 
 // @Title pixieHandler
 // @Description Dictionary with kernel, intrd(s) and commandline for pixiecore
+// @Summary Dictionary with kernel, intrd(s) and commandline for pixiecore
 // @Param macaddr    path    string    true    "MacAddress"
 // @Success 200    {object} string "Dictionary with kernel, intrd(s) and commandline for pixiecore"
-// @Failure 404    {object} string "Not in build mode"
-// @Failure 500    {object} string "Unable to find host definition for hostname"
+// @Failure 500    {object} string "failed to get pxe config"
 // @Router /v1/boot/{macaddr} [GET]
-func pixieHandler(response http.ResponseWriter, request *http.Request,
-	ps httprouter.Params, config Config, state State) {
+func pixieHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
-	macaddr := ps.ByName("macaddr")
+	pxeconfig, err := w.GetPxeConfig(ps.ByName("macaddr"))
 
-	state.Mux.Lock()
-	m, found := state.MachineByMAC[macaddr]
-	state.Mux.Unlock()
-
-	if found == false {
-		log.Println(found)
-		http.Error(response, "Not in build mode or definition does not exist", 404)
+	if err != nil {
+		http.Error(response, "failed to get pxe config", 500)
 		return
 	}
 
-	pxeconfig, _ := m.pixieInit()
 	result, _ := json.Marshal(pxeconfig)
 	response.Write(result)
 }
 
 // @Title healthHandler
 // @Description Check that Waitron is running
+// @Summary Check that Waitron is running
 // @Success 200    {object} string "{"State": "OK"}"
 // @Router /health [GET]
-func healthHandler(response http.ResponseWriter, request *http.Request,
-	ps httprouter.Params, config Config, state State) {
+func healthHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
 	result, _ := json.Marshal(&result{State: "OK"})
 
 	fmt.Fprintf(response, string(result))
 }
 
-func checkForStaleBuilds(state State) {
-
-	staleBuilds := make([]*Machine, 0)
-
-	state.Mux.Lock()
-
-	for _, m := range state.MachineByMAC {
-		if int(time.Now().Sub(m.BuildStart).Seconds()) >= m.StaleBuildThresholdSeconds {
-			staleBuilds = append(staleBuilds, m)
-		}
-	}
-
-	state.Mux.Unlock()
-
-	for _, m := range staleBuilds {
-		go func() {
-			if err := m.RunBuildCommands(m.StaleBuildCommands); err != nil {
-				log.Print(err)
-			}
-		}()
-	}
-}
-
 func main() {
 
-	config := flag.String("config", "", "Path to config file.")
+	configPath := flag.String("config", "", "Path to config file.")
 	address := flag.String("address", "", "Address to listen for requests.")
 	port := flag.String("port", "9090", "Port to listen for requests.")
 	flag.Parse()
 
-	configFile := *config
+	configFile := *configPath
 
 	if configFile == "" {
 		if configFile = os.Getenv("CONFIG_FILE"); configFile == "" {
@@ -356,57 +262,69 @@ func main() {
 		}
 	}
 
-	configuration, err := loadConfig(configFile)
+	configuration, err := config.LoadConfig(configFile)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	state := loadState()
+	w := waitron.New(configuration)
+	if err := w.Init(); err != nil {
+		log.Fatal(err)
+	}
 
 	r := httprouter.New()
-	r.GET("/list",
-		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			listMachinesHandler(response, request, ps, configuration, state)
-		})
 	r.PUT("/build/:hostname",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			buildHandler(response, request, ps, configuration, state)
+			buildHandler(response, request, ps, w)
 		})
-	r.GET("/rescue/:hostname",
+	r.PUT("/build/:hostname/:type",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			rescueHandler(response, request, ps, configuration, state)
+			buildHandler(response, request, ps, w)
 		})
 	r.GET("/status/:hostname",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			hostStatus(response, request, ps, configuration, state)
+			hostStatus(response, request, ps, w)
 		})
 	r.GET("/status",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			status(response, request, ps, configuration, state)
+			status(response, request, ps, w)
+		})
+	r.PUT("/cleanhistory",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			cleanHistory(response, request, ps, w)
 		})
 	r.GET("/definition/:hostname",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			definitionHandler(response, request, ps, configuration, state)
+			definitionHandler(response, request, ps, w)
 		})
+	r.GET("/definition/:hostname/:type",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			definitionHandler(response, request, ps, w)
+		})
+	r.GET("/job/:token",
+		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
+			jobDefinitionHandler(response, request, ps, w)
+		})
+
 	r.GET("/done/:hostname/:token",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			doneHandler(response, request, ps, configuration, state)
+			doneHandler(response, request, ps, w)
 		})
-	r.GET("/cancel/:hostname/:token",
+	r.PUT("/cancel/:hostname/:token",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			cancelHandler(response, request, ps, configuration, state)
+			cancelHandler(response, request, ps, w)
 		})
 	r.GET("/template/:template/:hostname/:token",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			templateHandler(response, request, ps, configuration, state)
+			templateHandler(response, request, ps, w)
 		})
 	r.GET("/v1/boot/:macaddr",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			pixieHandler(response, request, ps, configuration, state)
+			pixieHandler(response, request, ps, w)
 		})
 	r.GET("/health",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
-			healthHandler(response, request, ps, configuration, state)
+			healthHandler(response, request, ps, w)
 		})
 
 	if configuration.StaticFilesPath != "" {
@@ -415,25 +333,13 @@ func main() {
 		log.Println("Serving static files from " + configuration.StaticFilesPath)
 	}
 
-	if configuration.StaleBuildCheckFrequency <= 0 {
-		configuration.StaleBuildCheckFrequency = 300
+	if err := w.Run(); err != nil {
+		log.Fatal(fmt.Sprintf("waitron instance failed to run: %v", err))
 	}
 
-	ticker := time.NewTicker(time.Duration(configuration.StaleBuildCheckFrequency) * time.Second)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-		for _ = range ticker.C {
-			checkForStaleBuilds(state)
-		}
-	}()
-
 	log.Println("Starting Server on " + *address + ":" + *port)
-	log.Fatal(http.ListenAndServe(*address+":"+*port, handlers.LoggingHandler(os.Stdout, r)))
+	log.Fatal(http.ListenAndServe(*address+":"+*port, handlers.LoggingHandler(w.GetLogger(), r)))
 
-	ticker.Stop()
-	wg.Wait()
+	// This is practically a lie since nothing is properly catching signals AFAIK, but maybe in
+	w.Stop()
 }
