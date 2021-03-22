@@ -1,7 +1,8 @@
 package main
 
-// @APITitle Waitron
-// @APIDescription Templates for server provisioning
+// @Title Waitron
+// @Version 2
+// @Description Endpoints for server provisioning
 // @License BSD
 // @LicenseUrl http://opensource.org/licenses/BSD-2-Clause
 import (
@@ -26,6 +27,7 @@ type result struct {
 }
 
 // @Title definitionHandler
+// @Name definitionHandler
 // @Description Return the waitron configuration details for a machine
 // @Param hostname  path    string    true    "Hostname"
 // @Param type    	path    string    true    "Build Type"
@@ -49,6 +51,7 @@ func definitionHandler(response http.ResponseWriter, request *http.Request, ps h
 }
 
 // @Title jobDefinitionHandler
+// @Name jobDefinitionHandler
 // @Description Return details for the specified job token
 // @Param token    path    string    true    "Token"
 // @Success 200    {object} string "Job details in JSON format."
@@ -68,6 +71,7 @@ func jobDefinitionHandler(response http.ResponseWriter, request *http.Request, p
 }
 
 // @Title templateHandler
+// @Name templateHandler
 // @Description Render either the finish or the preseed template
 // @Param hostname    path    string    true    "Hostname"
 // @Param template    path    string    true    "The template to be rendered"
@@ -87,6 +91,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request, ps htt
 }
 
 // @Title buildHandler
+// @Name buildHandler
 // @Description Put the server in build mode
 // @Param hostname    path    string    true    "Hostname"
 // @Param type        path    string    true    "Build Type"
@@ -110,13 +115,12 @@ func buildHandler(response http.ResponseWriter, request *http.Request, ps httpro
 }
 
 // @Title doneHandler
+// @Name doneHandler
 // @Description Remove the server from build mode
 // @Param hostname    path    string    true    "Hostname"
 // @Param token        path    string    true    "Token"
 // @Success 200    {object} string "{"State": "OK"}"
 // @Failure 500    {object} string "Failed to finish build mode"
-// @Failure 400    {object} string "Not in build mode or definition does not exist"
-// @Failure 401    {object} string "Invalid token"
 // @Router /done/{hostname}/{token} [GET]
 func doneHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
@@ -133,13 +137,12 @@ func doneHandler(response http.ResponseWriter, request *http.Request, ps httprou
 }
 
 // @Title cancelHandler
+// @Name cancelHandler
 // @Description Remove the server from build mode
 // @Param hostname    path    string    true    "Hostname"
 // @Param token        path    string    true    "Token"
 // @Success 200    {object} string "{"State": "OK"}"
 // @Failure 500    {object} string "Failed to cancel build mode"
-// @Failure 400    {object} string "Not in build mode or definition does not exist"
-// @Failure 401    {object} string "Invalid token"
 // @Router /cancel/{hostname}/{token} [GET]
 func cancelHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
@@ -156,6 +159,7 @@ func cancelHandler(response http.ResponseWriter, request *http.Request, ps httpr
 }
 
 // @Title hostStatus
+// @Name hostStatus
 // @Description Build status of the server
 // @Param hostname    path    string    true    "Hostname"
 // @Success 200    {object} string "The status: (installing or installed)"
@@ -174,8 +178,10 @@ func hostStatus(response http.ResponseWriter, request *http.Request, ps httprout
 }
 
 // @Title status
+// @Name status
 // @Description Dictionary with jobs and status
 // @Success 200    {object} string "Dictionary with jobs and status"
+// @Success 500    {object} string "The error encountered"
 // @Router /status [GET]
 func status(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 	result, err := w.GetJobsHistoryBlob()
@@ -187,6 +193,7 @@ func status(response http.ResponseWriter, request *http.Request, ps httprouter.P
 }
 
 // @Title cleanHistory
+// @Name cleanHistory
 // @Description Clear all completed jobs from the in-memory history of Waitron
 // @Success 200    {object} string "{"State": "OK"}"
 // @Failure 500    {object} string "Failed to clean history"
@@ -203,6 +210,7 @@ func cleanHistory(response http.ResponseWriter, request *http.Request, ps httpro
 }
 
 // @Title pixieHandler
+// @Name pixieHandler
 // @Description Dictionary with kernel, intrd(s) and commandline for pixiecore
 // @Param macaddr    path    string    true    "MacAddress"
 // @Success 200    {object} string "Dictionary with kernel, intrd(s) and commandline for pixiecore"
@@ -222,6 +230,7 @@ func pixieHandler(response http.ResponseWriter, request *http.Request, ps httpro
 }
 
 // @Title healthHandler
+// @Name healthHandler
 // @Description Check that Waitron is running
 // @Success 200    {object} string "{"State": "OK"}"
 // @Router /health [GET]

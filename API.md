@@ -2,13 +2,14 @@
 
 
 # Waitron
+Endpoints for server provisioning
   
 
 ## Informations
 
 ### Version
 
-2.0
+2
 
 ### Contact
 
@@ -66,8 +67,6 @@ Remove the server from build mode
 | Code | Status | Description | Has headers | Schema |
 |------|--------|-------------|:-----------:|--------|
 | [200](#get-cancel-hostname-token-200) | OK | {"State": "OK"} |  | [schema](#get-cancel-hostname-token-200-schema) |
-| [400](#get-cancel-hostname-token-400) | Bad Request | Not in build mode or definition does not exist |  | [schema](#get-cancel-hostname-token-400-schema) |
-| [401](#get-cancel-hostname-token-401) | Unauthorized | Invalid token |  | [schema](#get-cancel-hostname-token-401-schema) |
 | [500](#get-cancel-hostname-token-500) | Internal Server Error | Failed to cancel build mode |  | [schema](#get-cancel-hostname-token-500-schema) |
 
 #### Responses
@@ -77,24 +76,6 @@ Remove the server from build mode
 Status: OK
 
 ###### <span id="get-cancel-hostname-token-200-schema"></span> Schema
-   
-  
-
-
-
-##### <span id="get-cancel-hostname-token-400"></span> 400 - Not in build mode or definition does not exist
-Status: Bad Request
-
-###### <span id="get-cancel-hostname-token-400-schema"></span> Schema
-   
-  
-
-
-
-##### <span id="get-cancel-hostname-token-401"></span> 401 - Invalid token
-Status: Unauthorized
-
-###### <span id="get-cancel-hostname-token-401-schema"></span> Schema
    
   
 
@@ -205,8 +186,6 @@ Remove the server from build mode
 | Code | Status | Description | Has headers | Schema |
 |------|--------|-------------|:-----------:|--------|
 | [200](#get-done-hostname-token-200) | OK | {"State": "OK"} |  | [schema](#get-done-hostname-token-200-schema) |
-| [400](#get-done-hostname-token-400) | Bad Request | Not in build mode or definition does not exist |  | [schema](#get-done-hostname-token-400-schema) |
-| [401](#get-done-hostname-token-401) | Unauthorized | Invalid token |  | [schema](#get-done-hostname-token-401-schema) |
 | [500](#get-done-hostname-token-500) | Internal Server Error | Failed to finish build mode |  | [schema](#get-done-hostname-token-500-schema) |
 
 #### Responses
@@ -216,24 +195,6 @@ Remove the server from build mode
 Status: OK
 
 ###### <span id="get-done-hostname-token-200-schema"></span> Schema
-   
-  
-
-
-
-##### <span id="get-done-hostname-token-400"></span> 400 - Not in build mode or definition does not exist
-Status: Bad Request
-
-###### <span id="get-done-hostname-token-400-schema"></span> Schema
-   
-  
-
-
-
-##### <span id="get-done-hostname-token-401"></span> 401 - Invalid token
-Status: Unauthorized
-
-###### <span id="get-done-hostname-token-401-schema"></span> Schema
    
   
 
@@ -326,6 +287,7 @@ Dictionary with jobs and status
 | Code | Status | Description | Has headers | Schema |
 |------|--------|-------------|:-----------:|--------|
 | [200](#get-status-200) | OK | Dictionary with jobs and status |  | [schema](#get-status-200-schema) |
+| [500](#get-status-500) | Internal Server Error | The error encountered |  | [schema](#get-status-500-schema) |
 
 #### Responses
 
@@ -334,6 +296,15 @@ Dictionary with jobs and status
 Status: OK
 
 ###### <span id="get-status-200-schema"></span> Schema
+   
+  
+
+
+
+##### <span id="get-status-500"></span> 500 - The error encountered
+Status: Internal Server Error
+
+###### <span id="get-status-500-schema"></span> Schema
    
   
 
