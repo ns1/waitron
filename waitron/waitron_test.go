@@ -312,6 +312,7 @@ func TestWaitron(t *testing.T) {
 	}
 
 	/******************************************************************/
+
 	blob, err := w.GetJobsHistoryBlob()
 	if err != nil {
 		t.Errorf("Failed to get jobs history blob: %v", err)
@@ -324,7 +325,7 @@ func TestWaitron(t *testing.T) {
 	}
 
 	if string(blob) == "[]" {
-		t.Errorf("History blob was unexpectedly has no jobs: %v", blob)
+		t.Errorf("History blob unexpectedly has no jobs: %v", blob)
 		return
 	}
 
@@ -339,6 +340,7 @@ func TestWaitron(t *testing.T) {
 		return
 	}
 
+	// This comes from history, not history cache blob.
 	_, err = w.GetJobStatus(token)
 	if err == nil {
 		t.Errorf("Able to get historical job status after cleaning")

@@ -98,7 +98,7 @@ func New(c *config.Config) *Waitron {
 		config:                c,
 		jobs:                  Jobs{},
 		history:               JobsHistory{},
-		historyBlobLastCached: time.Now().Add(time.Hour * -1),
+		historyBlobLastCached: time.Time{},
 		done:                  make(chan struct{}, 1),
 		wg:                    sync.WaitGroup{},
 		activePlugins:         make([]inventoryplugins.MachineInventoryPlugin, 0, 1),
@@ -844,6 +844,14 @@ func (w *Waitron) CleanHistory() error {
 		}
 	}
 
+	/*
+		We're not invalidating the history cache here.
+		Cleaning history will clean out complete jobs, which doesn't seem much different from
+		adding in new jobs.  If the purpose of the history blob is to reduce load when history
+		is queried frequently, this holds true even after cleaning since cleaning could still
+		leave you with a large job history if many jobs are in flight when the cleaning happens.
+	*/
+
 	return nil
 }
 
@@ -860,11 +868,19 @@ func (w *Waitron) GetJobsHistoryBlob() ([]byte, error) {
 	// https://github.com/golang/go/blob/0bd308ff27822378dc2db77d6dd0ad3c15ed2e08/src/runtime/map.go#L118
 	if len(w.history.jobByToken) == 0 {
 		w.addLog("no jobs, so returning empty job history", config.LogLevelInfo)
+
+		/*
+			If you do a lot of building, then prime the cache, then CleanHistory before ever calling GetJobsHistory again,
+			you'll end up holding onto the cache until you build things and check history again.
+			This really just seems like a symptom of the silly way the cache is built, so when someone does something smarter,
+			this will just go away.
+		*/
+		if len(w.historyBlobCache) > 2 {
+			w.historyBlobCache = []byte("[]")
+		}
+
 		return []byte("[]"), nil
 	}
-
-	// Each of the jobs in here needs to be RLock'ed as they are processed.
-	// I need to loop through them.  Just Marshal'ing the history isn't acceptable. :(
 
 	// This is simple but seems kind of dumb, but every suggested solution went crazy with marshal and unmarshal,
 	// which also seems dumb here but less simple. Did I miss something silly?
@@ -877,6 +893,8 @@ func (w *Waitron) GetJobsHistoryBlob() ([]byte, error) {
 	w.historyBlobCache = make([]byte, 1, 256*len(w.history.jobByToken))
 	w.historyBlobCache[0] = '['
 
+	// Each of the jobs in here needs to be RLock'ed as they are processed.
+	// I need to loop through them.  Just Marshal'ing the history isn't acceptable. :(
 	for _, job := range w.history.jobByToken {
 
 		job.RLock()
