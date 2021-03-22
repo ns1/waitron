@@ -1,0 +1,26 @@
+tests:
+  - "**/*test*"
+
+factory:
+  - "**/factory*"
+
+examples:
+  - "examples/**/*"
+
+api:
+  - main.go
+
+config:
+  - config/**/*
+
+machine:
+  - machine/**/*
+
+plugins:
+  - inventoryplugins/**/*
+
+waitron:
+  - waitron/**/*
+
+repo:
+  - ./*
