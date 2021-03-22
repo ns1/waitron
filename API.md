@@ -32,100 +32,23 @@ Endpoints for server provisioning
 
 | Method  | URI     | Name   | Summary |
 |---------|---------|--------|---------|
-| GET | /cancel/{hostname}/{token} | [get cancel hostname token](#get-cancel-hostname-token) |  |
-| GET | /cleanhistory | [get cleanhistory](#get-cleanhistory) |  |
-| GET | /definition/{hostname}/{type} | [get definition hostname type](#get-definition-hostname-type) |  |
-| GET | /done/{hostname}/{token} | [get done hostname token](#get-done-hostname-token) |  |
-| GET | /health | [get health](#get-health) |  |
-| GET | /job/{token} | [get job token](#get-job-token) |  |
-| GET | /status | [get status](#get-status) |  |
-| GET | /status/{hostname} | [get status hostname](#get-status-hostname) |  |
-| GET | /template/{template}/{hostname}/{token} | [get template template hostname token](#get-template-template-hostname-token) |  |
-| GET | /v1/boot/{macaddr} | [get v1 boot macaddr](#get-v1-boot-macaddr) |  |
-| PUT | /build/{hostname}/{type} | [put build hostname type](#put-build-hostname-type) |  |
+| GET | /definition/{hostname}/{type} | [get definition hostname type](#get-definition-hostname-type) | Return the waitron configuration details for a machine.  Note that "build type" is technically not required, depending on your config. |
+| GET | /done/{hostname}/{token} | [get done hostname token](#get-done-hostname-token) | Remove the server from build mode |
+| GET | /health | [get health](#get-health) | Check that Waitron is running |
+| GET | /job/{token} | [get job token](#get-job-token) | Return details for the specified job token |
+| GET | /status | [get status](#get-status) | Dictionary with jobs and status |
+| GET | /status/{hostname} | [get status hostname](#get-status-hostname) | Build status of the server |
+| GET | /template/{template}/{hostname}/{token} | [get template template hostname token](#get-template-template-hostname-token) | Render either the finish or the preseed template |
+| GET | /v1/boot/{macaddr} | [get v1 boot macaddr](#get-v1-boot-macaddr) | Dictionary with kernel, intrd(s) and commandline for pixiecore |
+| PUT | /build/{hostname}/{type} | [put build hostname type](#put-build-hostname-type) | Put the server in build mode |
+| PUT | /cancel/{hostname}/{token} | [put cancel hostname token](#put-cancel-hostname-token) | Remove the server from build mode |
+| PUT | /cleanhistory | [put cleanhistory](#put-cleanhistory) | Clear all completed jobs from the in-memory history of Waitron |
   
 
 
 ## Paths
 
-### <span id="get-cancel-hostname-token"></span> get cancel hostname token (*GetCancelHostnameToken*)
-
-```
-GET /cancel/{hostname}/{token}
-```
-
-Remove the server from build mode
-
-#### Parameters
-
-| Name | Source | Type | Go type | Separator | Required | Default | Description |
-|------|--------|------|---------|-----------| :------: |---------|-------------|
-| hostname | `path` | string | `string` |  | ✓ |  | Hostname |
-| token | `path` | string | `string` |  | ✓ |  | Token |
-
-#### All responses
-| Code | Status | Description | Has headers | Schema |
-|------|--------|-------------|:-----------:|--------|
-| [200](#get-cancel-hostname-token-200) | OK | {"State": "OK"} |  | [schema](#get-cancel-hostname-token-200-schema) |
-| [500](#get-cancel-hostname-token-500) | Internal Server Error | Failed to cancel build mode |  | [schema](#get-cancel-hostname-token-500-schema) |
-
-#### Responses
-
-
-##### <span id="get-cancel-hostname-token-200"></span> 200 - {"State": "OK"}
-Status: OK
-
-###### <span id="get-cancel-hostname-token-200-schema"></span> Schema
-   
-  
-
-
-
-##### <span id="get-cancel-hostname-token-500"></span> 500 - Failed to cancel build mode
-Status: Internal Server Error
-
-###### <span id="get-cancel-hostname-token-500-schema"></span> Schema
-   
-  
-
-
-
-### <span id="get-cleanhistory"></span> get cleanhistory (*GetCleanhistory*)
-
-```
-GET /cleanhistory
-```
-
-Clear all completed jobs from the in-memory history of Waitron
-
-#### All responses
-| Code | Status | Description | Has headers | Schema |
-|------|--------|-------------|:-----------:|--------|
-| [200](#get-cleanhistory-200) | OK | {"State": "OK"} |  | [schema](#get-cleanhistory-200-schema) |
-| [500](#get-cleanhistory-500) | Internal Server Error | Failed to clean history |  | [schema](#get-cleanhistory-500-schema) |
-
-#### Responses
-
-
-##### <span id="get-cleanhistory-200"></span> 200 - {"State": "OK"}
-Status: OK
-
-###### <span id="get-cleanhistory-200-schema"></span> Schema
-   
-  
-
-
-
-##### <span id="get-cleanhistory-500"></span> 500 - Failed to clean history
-Status: Internal Server Error
-
-###### <span id="get-cleanhistory-500-schema"></span> Schema
-   
-  
-
-
-
-### <span id="get-definition-hostname-type"></span> get definition hostname type (*GetDefinitionHostnameType*)
+### <span id="get-definition-hostname-type"></span> Return the waitron configuration details for a machine.  Note that "build type" is technically not required, depending on your config. (*GetDefinitionHostnameType*)
 
 ```
 GET /definition/{hostname}/{type}
@@ -167,7 +90,7 @@ Status: Not Found
 
 
 
-### <span id="get-done-hostname-token"></span> get done hostname token (*GetDoneHostnameToken*)
+### <span id="get-done-hostname-token"></span> Remove the server from build mode (*GetDoneHostnameToken*)
 
 ```
 GET /done/{hostname}/{token}
@@ -209,7 +132,7 @@ Status: Internal Server Error
 
 
 
-### <span id="get-health"></span> get health (*GetHealth*)
+### <span id="get-health"></span> Check that Waitron is running (*GetHealth*)
 
 ```
 GET /health
@@ -234,7 +157,7 @@ Status: OK
 
 
 
-### <span id="get-job-token"></span> get job token (*GetJobToken*)
+### <span id="get-job-token"></span> Return details for the specified job token (*GetJobToken*)
 
 ```
 GET /job/{token}
@@ -275,7 +198,7 @@ Status: Not Found
 
 
 
-### <span id="get-status"></span> get status (*GetStatus*)
+### <span id="get-status"></span> Dictionary with jobs and status (*GetStatus*)
 
 ```
 GET /status
@@ -310,7 +233,7 @@ Status: Internal Server Error
 
 
 
-### <span id="get-status-hostname"></span> get status hostname (*GetStatusHostname*)
+### <span id="get-status-hostname"></span> Build status of the server (*GetStatusHostname*)
 
 ```
 GET /status/{hostname}
@@ -351,7 +274,7 @@ Status: Not Found
 
 
 
-### <span id="get-template-template-hostname-token"></span> get template template hostname token (*GetTemplateTemplateHostnameToken*)
+### <span id="get-template-template-hostname-token"></span> Render either the finish or the preseed template (*GetTemplateTemplateHostnameToken*)
 
 ```
 GET /template/{template}/{hostname}/{token}
@@ -394,7 +317,7 @@ Status: Bad Request
 
 
 
-### <span id="get-v1-boot-macaddr"></span> get v1 boot macaddr (*GetV1BootMacaddr*)
+### <span id="get-v1-boot-macaddr"></span> Dictionary with kernel, intrd(s) and commandline for pixiecore (*GetV1BootMacaddr*)
 
 ```
 GET /v1/boot/{macaddr}
@@ -435,7 +358,7 @@ Status: Internal Server Error
 
 
 
-### <span id="put-build-hostname-type"></span> put build hostname type (*PutBuildHostnameType*)
+### <span id="put-build-hostname-type"></span> Put the server in build mode (*PutBuildHostnameType*)
 
 ```
 PUT /build/{hostname}/{type}
@@ -472,6 +395,83 @@ Status: OK
 Status: Internal Server Error
 
 ###### <span id="put-build-hostname-type-500-schema"></span> Schema
+   
+  
+
+
+
+### <span id="put-cancel-hostname-token"></span> Remove the server from build mode (*PutCancelHostnameToken*)
+
+```
+PUT /cancel/{hostname}/{token}
+```
+
+Remove the server from build mode
+
+#### Parameters
+
+| Name | Source | Type | Go type | Separator | Required | Default | Description |
+|------|--------|------|---------|-----------| :------: |---------|-------------|
+| hostname | `path` | string | `string` |  | ✓ |  | Hostname |
+| token | `path` | string | `string` |  | ✓ |  | Token |
+
+#### All responses
+| Code | Status | Description | Has headers | Schema |
+|------|--------|-------------|:-----------:|--------|
+| [200](#put-cancel-hostname-token-200) | OK | {"State": "OK"} |  | [schema](#put-cancel-hostname-token-200-schema) |
+| [500](#put-cancel-hostname-token-500) | Internal Server Error | Failed to cancel build mode |  | [schema](#put-cancel-hostname-token-500-schema) |
+
+#### Responses
+
+
+##### <span id="put-cancel-hostname-token-200"></span> 200 - {"State": "OK"}
+Status: OK
+
+###### <span id="put-cancel-hostname-token-200-schema"></span> Schema
+   
+  
+
+
+
+##### <span id="put-cancel-hostname-token-500"></span> 500 - Failed to cancel build mode
+Status: Internal Server Error
+
+###### <span id="put-cancel-hostname-token-500-schema"></span> Schema
+   
+  
+
+
+
+### <span id="put-cleanhistory"></span> Clear all completed jobs from the in-memory history of Waitron (*PutCleanhistory*)
+
+```
+PUT /cleanhistory
+```
+
+Clear all completed jobs from the in-memory history of Waitron
+
+#### All responses
+| Code | Status | Description | Has headers | Schema |
+|------|--------|-------------|:-----------:|--------|
+| [200](#put-cleanhistory-200) | OK | {"State": "OK"} |  | [schema](#put-cleanhistory-200-schema) |
+| [500](#put-cleanhistory-500) | Internal Server Error | Failed to clean history |  | [schema](#put-cleanhistory-500-schema) |
+
+#### Responses
+
+
+##### <span id="put-cleanhistory-200"></span> 200 - {"State": "OK"}
+Status: OK
+
+###### <span id="put-cleanhistory-200-schema"></span> Schema
+   
+  
+
+
+
+##### <span id="put-cleanhistory-500"></span> 500 - Failed to clean history
+Status: Internal Server Error
+
+###### <span id="put-cleanhistory-500-schema"></span> Schema
    
   
 

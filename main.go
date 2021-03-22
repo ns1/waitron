@@ -27,8 +27,8 @@ type result struct {
 }
 
 // @Title definitionHandler
-// @Name definitionHandler
 // @Description Return the waitron configuration details for a machine
+// @Summary Return the waitron configuration details for a machine.  Note that "build type" is technically not required, depending on your config.
 // @Param hostname  path    string    true    "Hostname"
 // @Param type    	path    string    true    "Build Type"
 // @Success 200    {object} string "Machine config in JSON format."
@@ -51,8 +51,8 @@ func definitionHandler(response http.ResponseWriter, request *http.Request, ps h
 }
 
 // @Title jobDefinitionHandler
-// @Name jobDefinitionHandler
 // @Description Return details for the specified job token
+// @Summary Return details for the specified job token
 // @Param token    path    string    true    "Token"
 // @Success 200    {object} string "Job details in JSON format."
 // @Failure 404    {object} string "Job not found"
@@ -71,8 +71,8 @@ func jobDefinitionHandler(response http.ResponseWriter, request *http.Request, p
 }
 
 // @Title templateHandler
-// @Name templateHandler
 // @Description Render either the finish or the preseed template
+// @Summary Render either the finish or the preseed template
 // @Param hostname    path    string    true    "Hostname"
 // @Param template    path    string    true    "The template to be rendered"
 // @Param token        path    string    true    "Token"
@@ -80,6 +80,8 @@ func jobDefinitionHandler(response http.ResponseWriter, request *http.Request, p
 // @Failure 400    {object} string "Unable to render template"
 // @Router /template/{template}/{hostname}/{token} [GET]
 func templateHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
+
+	/* This eventually should to change to a PUT/POST because it causes changes. */
 
 	renderedTemplate, err := w.RenderStageTemplate(ps.ByName("token"), ps.ByName("template"))
 	if err != nil {
@@ -91,8 +93,8 @@ func templateHandler(response http.ResponseWriter, request *http.Request, ps htt
 }
 
 // @Title buildHandler
-// @Name buildHandler
 // @Description Put the server in build mode
+// @Summary Put the server in build mode
 // @Param hostname    path    string    true    "Hostname"
 // @Param type        path    string    true    "Build Type"
 // @Success 200    {object} string "{"State": "OK", "Token": <UUID of the build>}"
@@ -115,14 +117,16 @@ func buildHandler(response http.ResponseWriter, request *http.Request, ps httpro
 }
 
 // @Title doneHandler
-// @Name doneHandler
 // @Description Remove the server from build mode
+// @Summary Remove the server from build mode
 // @Param hostname    path    string    true    "Hostname"
 // @Param token        path    string    true    "Token"
 // @Success 200    {object} string "{"State": "OK"}"
 // @Failure 500    {object} string "Failed to finish build mode"
 // @Router /done/{hostname}/{token} [GET]
 func doneHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
+
+	/* This eventually should to change to a PUT/POST because it causes changes. */
 
 	err := w.FinishBuild(ps.ByName("hostname"), ps.ByName("token"))
 
@@ -137,14 +141,16 @@ func doneHandler(response http.ResponseWriter, request *http.Request, ps httprou
 }
 
 // @Title cancelHandler
-// @Name cancelHandler
 // @Description Remove the server from build mode
+// @Summary Remove the server from build mode
 // @Param hostname    path    string    true    "Hostname"
 // @Param token        path    string    true    "Token"
 // @Success 200    {object} string "{"State": "OK"}"
 // @Failure 500    {object} string "Failed to cancel build mode"
-// @Router /cancel/{hostname}/{token} [GET]
+// @Router /cancel/{hostname}/{token} [PUT]
 func cancelHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
+
+	/* This eventually should to change to a PUT/POST because it causes changes. */
 
 	err := w.CancelBuild(ps.ByName("hostname"), ps.ByName("token"))
 
@@ -159,8 +165,8 @@ func cancelHandler(response http.ResponseWriter, request *http.Request, ps httpr
 }
 
 // @Title hostStatus
-// @Name hostStatus
 // @Description Build status of the server
+// @Summary Build status of the server
 // @Param hostname    path    string    true    "Hostname"
 // @Success 200    {object} string "The status: (installing or installed)"
 // @Failure 404    {object} string "Failed to find active job for host"
@@ -178,8 +184,8 @@ func hostStatus(response http.ResponseWriter, request *http.Request, ps httprout
 }
 
 // @Title status
-// @Name status
 // @Description Dictionary with jobs and status
+// @Summary Dictionary with jobs and status
 // @Success 200    {object} string "Dictionary with jobs and status"
 // @Success 500    {object} string "The error encountered"
 // @Router /status [GET]
@@ -193,11 +199,11 @@ func status(response http.ResponseWriter, request *http.Request, ps httprouter.P
 }
 
 // @Title cleanHistory
-// @Name cleanHistory
 // @Description Clear all completed jobs from the in-memory history of Waitron
+// @Summary Clear all completed jobs from the in-memory history of Waitron
 // @Success 200    {object} string "{"State": "OK"}"
 // @Failure 500    {object} string "Failed to clean history"
-// @Router /cleanhistory [GET]
+// @Router /cleanhistory [PUT]
 func cleanHistory(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 	err := w.CleanHistory()
 	if err != nil {
@@ -210,8 +216,8 @@ func cleanHistory(response http.ResponseWriter, request *http.Request, ps httpro
 }
 
 // @Title pixieHandler
-// @Name pixieHandler
 // @Description Dictionary with kernel, intrd(s) and commandline for pixiecore
+// @Summary Dictionary with kernel, intrd(s) and commandline for pixiecore
 // @Param macaddr    path    string    true    "MacAddress"
 // @Success 200    {object} string "Dictionary with kernel, intrd(s) and commandline for pixiecore"
 // @Failure 500    {object} string "failed to get pxe config"
@@ -230,8 +236,8 @@ func pixieHandler(response http.ResponseWriter, request *http.Request, ps httpro
 }
 
 // @Title healthHandler
-// @Name healthHandler
 // @Description Check that Waitron is running
+// @Summary Check that Waitron is running
 // @Success 200    {object} string "{"State": "OK"}"
 // @Router /health [GET]
 func healthHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
@@ -304,7 +310,7 @@ func main() {
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			doneHandler(response, request, ps, w)
 		})
-	r.GET("/cancel/:hostname/:token",
+	r.PUT("/cancel/:hostname/:token",
 		func(response http.ResponseWriter, request *http.Request, ps httprouter.Params) {
 			cancelHandler(response, request, ps, w)
 		})
