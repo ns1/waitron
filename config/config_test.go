@@ -5,7 +5,7 @@ import (
 )
 
 func TestLoadConfig(t *testing.T) {
-	c, err := LoadConfig("../config.yaml")
+	c, err := LoadConfig("../examples/config.yaml")
 	if err != nil {
 		t.Errorf("Failed to load test configuration")
 	}
