@@ -47,8 +47,6 @@ build_types:
         params:
             nameservers: "8.8.8.8"    
             os_version_name: "rescue-image"
-            ipmi_endpoint: http://ipmi01.lga02.prod0.example.com/api/command        
-
 
 ######################################## HOW DETAILS ARE MERGED ###############################################
 # During builds, the order of merging looks like this [base config (config.yml)] -> [build type] -> [machine] #
