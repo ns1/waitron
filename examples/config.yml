@@ -1,0 +1,119 @@
+# During an active build, anything in here can be requested and will be rendered and returned in the API response.
+# preseed/cloud-init, finish, and any other templates used in your build should go here.
+templatepath: /etc/waitron/templates
+
+staticspath: /etc/waitron/files
+
+# In order of increasing verbosity: ERROR, WARN, INFO, DEBUG
+log_level: INFO
+
+# For how long do you want the job history json blog to be cached once requested?
+history_cache_seconds: 20
+
+# The URL of your Waitron service
+baseurl: http://waitron.example.com:7078
+
+# During builds, inventory plugins will be checked for machine details in the order below.
+# Details found will me merged according to the details for the [weight] option below.
+inventory_plugins:
+    - name: file
+      type: file
+      # [weight] is used to determine how inventory data should be merged.  The default is 0.
+      # Plugins of the same weight can be merged.
+      # Plugins of greater weight will COMPLETELY overwrite data of lower weights that had be compiled prior to their execution.
+      #weight: 0
+      additional_options:
+              # [grouppath] is an optional path that can be used to include "group-wide" config details.
+              # For example a host named dns02.example.com.yml would be seen as belonging to the group "example.com"
+              # During builds /etc/waitron/groups/example.com.yml would be searched and have its config details used if found.
+              grouppath: /etc/waitron/groups/ 
+
+              # [machinepath] is a required path for this plugin.
+              # If a build is requested for hostname "dns02.example.com"
+              # this path would be searched for dns02.example.com.yml.
+              machinepath: /etc/waitron/machines/
+
+#############################################################################
+# New build types can be specified here.                                    #
+# Any option that exists in the "DEFAULTS" section below can be overridden. #
+#############################################################################
+build_types:
+    rescue:
+        image_url: http://waitron.example.com:7078/files/
+        kernel: vmlinuz64
+        initrd: corepure64.gz
+        cmdline: " loglevel=3 nameservers=2001:4860:4860::8888 ipv6_address={{machine.Params.provisioning_address}} ipv6_gateway={{machine.Params.provisioning_gateway}} ipv6_cidr={{machine.Params.provisioning_cidr}} "
+        stale_build_threshold_secs: 9000
+        params:
+            nameservers: "8.8.8.8"    
+            os_version_name: "rescue-image"
+            ipmi_endpoint: http://ipmi01.lga02.prod0.example.com/api/command        
+
+
+######################################## HOW DETAILS ARE MERGED ###############################################
+# During builds, the order of merging looks like this [base config (config.yml)] -> [build type] -> [machine] #
+# Details specified in machine details have the highest precedence.                                           #
+# Array/lists are merged as details are merged.                                                               #
+# Dictionaries are merged but existing values are replaced.                                                   #
+# Simple values get replaced.                                                                                 #
+###############################################################################################################
+
+################################# DEFAULTS ############################################
+# Everything below will function as "default" build options.                          #
+# If no build type is specified during the build request, these options will be used. #
+# The can be overridden in whole or in part in a build-type specification             #
+#######################################################################################
+operatingsystem: "18.04"
+kernel: linux
+image_url: http://archive.ubuntu.com/ubuntu/dists/bionic-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/
+initrd: initrd.gz
+preseed: preseed.j2
+finish: finish.j2
+
+stale_build_threshold_secs: 900
+stale_build_check_frequency_secs: 300
+
+# These are example params and could be any extra details that you want to access in your templates.
+# For eaxmple,  {{ machine.Params.apt_hostname }}
+params:
+    apt_hostname: "archive.ubuntu.com"
+    apt_path: "/ubuntu/"
+    nameservers: "8.8.8.8"    
+    ntp_server: "pool.ntp.org"
+    include_packages: "python2.7 ipmitool lsb-release openssh-server vim ifenslave vlan lldpd secure-delete curl wget strace"
+    os_version_name: "bionic"
+    ipmi_endpoint: http://ipmi01.lga02.prod0.example.com/api/command
+
+
+# Any of the commands below can be written inline directly in the config file or can be include from additional templates.
+# [stalebuild_commands] will be run when the build has taken longer than [stale_build_threshold_secs]
+stalebuild_commands:
+  - command: |
+        {% include "/etc/waitron/templates/messages/stale.j2" %}
+    errors_fatal: true  # Should errors be returned and cause any further commands to be skipped?
+    timeout_seconds: 10 # How long should the command be allowed to run?
+    should_log: true    # Should the command be logged?
+
+# [prebuild_commands] will be run when the machine is requested but before the machine is put into build mode.
+prebuild_commands:
+  - command: |
+        {% include "/etc/waitron/templates/messages/build.j2" %}
+    errors_fatal: true
+    timeout_seconds: 10
+    should_log: false
+
+# [postbuild_commands] will be run once the "done" api endpoint has been hit but before the job is cleaned up and marked as "completed"
+postbuild_commands:
+  - command: |
+        {% include "/etc/waitron/templates/messages/done.j2" %}
+    errors_fatal: true
+    timeout_seconds: 10
+    should_log: false
+
+# [cancelbuild_commands] will be run once the "cancel" api endpoint has been hit but before the job is cleaned up and marked as "terminated"
+cancelbuild_commands:
+  - command: |
+        {% include "/etc/waitron/templates/messages/cancel.j2" %}
+    errors_fatal: true
+    timeout_seconds: 10
+    should_log: false

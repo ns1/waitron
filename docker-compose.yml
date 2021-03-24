@@ -1,0 +1,11 @@
+waitron:
+    #cap_add:
+    #- NET_ADMIN # Uncomment if you expect to have waitron manipulate local iptables configs with build commands.
+    command: ' --port 7078 '
+    image: waitron:latest
+    log_driver: syslog
+    log_opt:
+        tag: '{{ .ImageName }}/{{ .Name }}'
+    net: host
+    volumes:
+    - ./examples/:/etc/waitron/

@@ -1,3 +1,17 @@
-FROM golang:1-onbuild
+FROM golang:1.15-buster as builder
 
-EXPOSE 9090
+ENV GOPATH=/opt/go
+
+RUN mkdir -p /opt/go/src/github.com/ns1/waitron \
+    && git clone https://github.com/ns1/waitron.git /opt/go/src/github.com/ns1/waitron \
+    && cd /opt/go/src/github.com/ns1/waitron \
+    && mkdir bin \
+    && go build -o bin/waitron . \
+    && mv bin/waitron /usr/local/bin/waitron
+
+FROM debian:buster-slim
+# Install some basic tools for use in build commands.
+RUN apt-get -y update && apt-get -y install wget curl ipmitool strace openssh-client iputils-ping dnsutils httpie iptables
+COPY --from=builder /usr/local/bin/waitron /usr/local/bin/waitron
+
+ENTRYPOINT [ "waitron", "--config", "/etc/waitron/config.yml"]
