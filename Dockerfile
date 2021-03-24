@@ -5,7 +5,6 @@ ENV GOPATH=/opt/go
 RUN mkdir -p /opt/go/src/github.com/ns1/waitron \
     && git clone https://github.com/ns1/waitron.git /opt/go/src/github.com/ns1/waitron \
     && cd /opt/go/src/github.com/ns1/waitron \
-    && mkdir bin \
     && go build -o bin/waitron . \
     && mv bin/waitron /usr/local/bin/waitron
 
