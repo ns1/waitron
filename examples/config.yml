@@ -1,7 +1,12 @@
+# The URL of your Waitron service
+baseurl: http://waitron.example.com:7078
+
 # During an active build, anything in here can be requested and will be rendered and returned in the API response.
 # preseed/cloud-init, finish, and any other templates used in your build should go here.
 templatepath: /etc/waitron/templates
 
+# Any files that you build depends on, or if you just want to host some of your own images,
+# such as a small rescue kernel+initrd can be stored here and will be accessible at  [baseurl]/files/
 staticspath: /etc/waitron/files
 
 # In order of increasing verbosity: ERROR, WARN, INFO, DEBUG
@@ -9,9 +14,6 @@ log_level: INFO
 
 # For how long do you want the job history json blog to be cached once requested?
 history_cache_seconds: 20
-
-# The URL of your Waitron service
-baseurl: http://waitron.example.com:7078
 
 # During builds, inventory plugins will be checked for machine details in the order below.
 # Details found will me merged according to the details for the [weight] option below.
@@ -39,7 +41,7 @@ inventory_plugins:
 #############################################################################
 build_types:
     rescue:
-        image_url: http://waitron.example.com:7078/files/
+        image_url: http://waitron.example.com:7078/files/ # See "staticspath" above for more details about the value used here.
         kernel: vmlinuz64
         initrd: corepure64.gz
         cmdline: " loglevel=3 nameservers=2001:4860:4860::8888 ipv6_address={{machine.Params.provisioning_address}} ipv6_gateway={{machine.Params.provisioning_gateway}} ipv6_cidr={{machine.Params.provisioning_cidr}} "
