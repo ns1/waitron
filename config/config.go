@@ -61,6 +61,7 @@ type MachineInventoryPluginSettings struct {
 	AuthPassword      string                 `yaml:"auth_password"`
 	AuthToken         string                 `yaml:"auth_token"`
 	AdditionalOptions map[string]interface{} `yaml:"additional_options"`
+	Weight            int                    `yaml:"weight"`
 	WriteEnabled      bool                   `yaml:"writable"`
 	Disabled          bool                   `yaml:"disabled"`
 }

@@ -61,6 +61,11 @@ type Job struct {
 	Token         string
 }
 
+type activePlugin struct {
+	plugin   inventoryplugins.MachineInventoryPlugin
+	settings *config.MachineInventoryPluginSettings
+}
+
 type Waitron struct {
 	config  *config.Config
 	jobs    Jobs
@@ -72,7 +77,7 @@ type Waitron struct {
 	done chan struct{}
 	wg   sync.WaitGroup
 
-	activePlugins []inventoryplugins.MachineInventoryPlugin
+	activePlugins []activePlugin
 
 	logs chan string
 }
@@ -101,7 +106,7 @@ func New(c *config.Config) *Waitron {
 		historyBlobLastCached: time.Time{},
 		done:                  make(chan struct{}, 1),
 		wg:                    sync.WaitGroup{},
-		activePlugins:         make([]inventoryplugins.MachineInventoryPlugin, 0, 1),
+		activePlugins:         make([]activePlugin, 0, 1),
 		logs:                  make(chan string, 1000),
 	}
 
@@ -168,7 +173,7 @@ func (w *Waitron) initPlugins() error {
 				return err
 			}
 
-			w.activePlugins = append(w.activePlugins, p)
+			w.activePlugins = append(w.activePlugins, activePlugin{plugin: p, settings: &cp})
 		}
 	}
 	return nil
@@ -437,8 +442,18 @@ func (w *Waitron) getMergedInventoryMachine(hostname string, mac string) (*machi
 		Take the hostname and start looping through the inventory plugins
 		Merge details as you get them into a single, compiled Machine object
 	*/
-	for _, p := range w.activePlugins {
-		pm, err := p.GetMachine(hostname, mac)
+	maxWeightSeen := 0
+	for _, ap := range w.activePlugins {
+
+		/*
+			If we've already found details in a higher-precedence plugins, there's no need to even check the current one.
+			This would mean that a plugin of greater weight was executed AND returned data.
+		*/
+		if ap.settings.Weight < maxWeightSeen {
+			continue
+		}
+
+		pm, err := ap.plugin.GetMachine(hostname, mac)
 
 		if err != nil {
 			w.addLog(fmt.Sprintf("failed to get machine from plugin in: %v", err), config.LogLevelInfo)
@@ -448,12 +463,21 @@ func (w *Waitron) getMergedInventoryMachine(hostname string, mac string) (*machi
 		if pm != nil {
 			// Just keep merging in details that we find
 			if b, err := yaml.Marshal(pm); err == nil {
+
+				/*
+					But if we are now working on the response from a plugin with a greater weight than all previous plugins that returned data,
+					then we need to clobber all the previous data and let this current one replace it all.
+				*/
+				if ap.settings.Weight > maxWeightSeen {
+					m = &machine.Machine{}
+					maxWeightSeen = ap.settings.Weight
+				}
+
 				if err = yaml.Unmarshal(b, m); err != nil {
-					// Just log.  Don't let one plugin break everything.
-					w.addLog(fmt.Sprintf("failed to unmarshal plugin data during machine merging: %v", err), config.LogLevelError)
-					continue
+					return nil, err
 				}
 			} else {
+				// Just log.  Don't let one plugin break everything.
 				w.addLog(fmt.Sprintf("failed to marshal plugin data during machine merging: %v", err), config.LogLevelError)
 				continue
 			}
