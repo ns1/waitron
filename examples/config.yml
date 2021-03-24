@@ -61,6 +61,7 @@ build_types:
 # If no build type is specified during the build request, these options will be used. #
 # The can be overridden in whole or in part in a build-type specification             #
 #######################################################################################
+cmdline: "netcfg/get_nameservers=8.8.4.4 netcfg/disable_dhcp=true interface={{ machine.Network.0.Name }} ksdevice={{ machine.Network.0.Name }} netcfg/get_ipaddress={{ machine.Network.0.Addresses4.0.IPAddress }} netcfg/get_gateway={{ machine.Network.0.Gateway4 }} netcfg/get_netmask={{ machine.Network.0.Addresses4.0.Netmask }} url={{ BaseURL }}/template/preseed/{{ Hostname }}/{{ Token }} ramdisk_size=10800 root=/dev/rd/0 rw auto hostname={{ Hostname }} console-setup/ask_detect=false console-setup/layout=USA console-setup/variant=USA keyboard-configuration/layoutcode=us localechooser/translation/warn-light=true localechooser/translation/warn-severe=true locale=en_US"
 operatingsystem: "18.04"
 kernel: linux
 image_url: http://archive.ubuntu.com/ubuntu/dists/bionic-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/
