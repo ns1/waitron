@@ -5,17 +5,14 @@ import (
 )
 
 func TestLoadConfig(t *testing.T) {
-	c, err := LoadConfig("../examples/config.yaml")
+	_, err := LoadConfig("../examples/config.yml")
 	if err != nil {
 		t.Errorf("Failed to load test configuration")
-	}
-	if c.TemplatePath != "templates" {
-		t.Errorf("invalid template path")
 	}
 }
 
 func TestInvalidConfig(t *testing.T) {
-	_, err := LoadConfig("invalid.yaml")
+	_, err := LoadConfig("invalid.yml")
 	if err == nil {
 		t.Errorf("No error presented when invalid configuration is loaded")
 	}
