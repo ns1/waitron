@@ -10,9 +10,9 @@ The 2.0.0 branch of this repo still has a large portion of the original from Jha
 
 [![Build Status](https://travis-ci.org/ns1/waitron.svg?branch=master)](https://travis-ci.org/ns1/waitron)
 
-Waitron is used to machines definitions from any number of specified inventory sourcestemplates preseed and finish scripts based on that data.
+Waitron is used to build machines (primarily bare-metal, but anything that understands PXE booting will work) based on definitions from any number of specified inventory sources.
 
-When a server is set in _build mode_, Eaitron will deliver a kernel/initrd/commandline used by [pixiecore](https://github.com/danderson/pixiecore) (in API mode) to boot and install the machine.
+When a server is set in _build mode_, Waitron will deliver a kernel/initrd/commandline used by [pixiecore](https://github.com/danderson/pixiecore) (in API mode) to boot and install the machine.
 
 Try it out in a docker:
 
