@@ -54,7 +54,7 @@ build_types:
 # During builds, the order of merging looks like this [base config (config.yml)] -> [build type] -> [machine] #
 # Details specified in machine details have the highest precedence.                                           #
 # Array/lists are merged as details are merged.                                                               #
-# Dictionaries are merged but existing values are replaced.                                                   #
+# Dictionaries are merged but existing simple values are replaced.                                            #
 # Simple values get replaced.                                                                                 #
 ###############################################################################################################
 
