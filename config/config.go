@@ -40,17 +40,20 @@ type BuildType struct {
 	Initrd   string `yaml:"initrd,omitempty"`
 	ImageURL string `yaml:"image_url,omitempty"`
 
-	OperatingSystem string `yaml:"operatingsystem,omitempty"`
-	Finish          string `yaml:"finish,omitempty"`
-	Preseed         string `yaml:"preseed,omitempty"`
-	Params          map[string]string
+	OperatingSystem string            `yaml:"operatingsystem,omitempty"`
+	Finish          string            `yaml:"finish,omitempty"`
+	Preseed         string            `yaml:"preseed,omitempty"`
+	Params          map[string]string `yaml:"params,omitempty"`
 
 	StaleBuildThresholdSeconds int `yaml:"stale_build_threshold_secs,omitempty"`
 
-	StaleBuildCommands  []BuildCommand `yaml:"stalebuild_commands,omitempty"`
-	PreBuildCommands    []BuildCommand `yaml:"prebuild_commands,omitempty"`
-	PostBuildCommands   []BuildCommand `yaml:"postbuild_commands,omitempty"`
-	CancelBuildCommands []BuildCommand `yaml:"cancelbuild_commands,omitempty"`
+	StaleBuildCommands   []BuildCommand `yaml:"stalebuild_commands,omitempty"`
+	PreBuildCommands     []BuildCommand `yaml:"prebuild_commands,omitempty"`
+	PostBuildCommands    []BuildCommand `yaml:"postbuild_commands,omitempty"`
+	CancelBuildCommands  []BuildCommand `yaml:"cancelbuild_commands,omitempty"`
+	UnknownBuildCommands []BuildCommand `yaml:"unknownbuild_commands,omitempty"`
+
+	Tags []string `yaml:"tags`
 }
 
 type MachineInventoryPluginSettings struct {

@@ -25,8 +25,12 @@ import (
 
 /*
 	TODO:
-		At least improve how the pre/post/cancel/stale build commands work
-		Figure out logging
+		At least improve how the pre/post/cancel/stale build commands work.
+
+		Figure out logging.
+
+		Take a look at what actually needs to be exported here.  Seems like not much, so either
+		move some of the Job* stuff to a separate package and make the rest fields public, or stop exporting the struct and also just make the properties private.
 */
 
 // PixieConfig boot configuration
@@ -326,12 +330,12 @@ func (w *Waitron) runBuildCommands(j *Job, b []config.BuildCommand) error {
 		cmdline, err := tpl.Execute(pongo2.Context{"job": j, "machine": j.Machine, "token": j.Token})
 		j.RUnlock()
 
-		if buildCommand.ShouldLog {
-			w.addLog(cmdline, config.LogLevelInfo)
-		}
-
 		if err != nil {
 			return err
+		}
+
+		if buildCommand.ShouldLog {
+			w.addLog(cmdline, config.LogLevelInfo)
 		}
 
 		// Now actually execute the command and return err if ErrorsFatal
@@ -411,8 +415,10 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 	r := strings.NewReplacer(":", "", "-", "", ".", "")
 
 	for i := 0; i < len(j.Machine.Network); i++ {
-		j.Machine.Network[i].MacAddress = strings.ToLower(r.Replace(j.Machine.Network[i].MacAddress))
-		macs = append(macs, j.Machine.Network[i].MacAddress)
+		if j.Machine.Network[i].MacAddress != "" {
+			j.Machine.Network[i].MacAddress = strings.ToLower(r.Replace(j.Machine.Network[i].MacAddress))
+			macs = append(macs, j.Machine.Network[i].MacAddress)
+		}
 	}
 
 	w.addLog(fmt.Sprintf("adding job %s", token), config.LogLevelDebug)
@@ -685,6 +691,24 @@ func (w *Waitron) getPxeConfigForUnknown(b *config.BuildType, macaddress string)
 		return PixieConfig{}, fmt.Errorf("job not found for  '%s' and _unknown_ builds not requested", macaddress)
 	}
 
+	w.addLog(fmt.Sprintf("running unknown-build commands for job %s", macaddress), config.LogLevelDebug)
+
+	// Perform any desired operations when an unknown MAC is seen.
+	if len(w.config.UnknownBuildCommands) > 0 {
+		/*
+			I don't want runBuildCommands to accept an empty interface.
+			For now, at least, I'd prefer sending in a nearly empty job and repurposing the Token field to send the MAC
+		*/
+		j := &Job{
+			Token: macaddress,
+		}
+
+		if err := w.runBuildCommands(j, w.config.UnknownBuildCommands); err != nil {
+			w.addLog(fmt.Sprintf("unknown-build commands for %s returned errors %v", macaddress, err), config.LogLevelDebug)
+			return PixieConfig{}, err
+		}
+	}
+
 	w.addLog("going to send _unknown_ details to unknown mac", config.LogLevelInfo)
 
 	pixieConfig := PixieConfig{}
@@ -914,7 +938,7 @@ func (w *Waitron) GetJobsHistoryBlob() ([]byte, error) {
 	}
 
 	w.addLog(fmt.Sprintf("rebuilding stale history blob cache of %d jobs", len(w.history.jobByToken)), config.LogLevelInfo)
-	w.historyBlobCache = make([]byte, 1, 256*len(w.history.jobByToken))
+	w.historyBlobCache = make([]byte, 0, 256*len(w.history.jobByToken))
 	w.historyBlobCache[0] = '['
 
 	// Each of the jobs in here needs to be RLock'ed as they are processed.

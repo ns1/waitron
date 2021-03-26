@@ -18,22 +18,30 @@ history_cache_seconds: 20
 # During builds, inventory plugins will be checked for machine details in the order below.
 # Details found will me merged according to the details for the [weight] option below.
 inventory_plugins:
-    - name: file
-      type: file
+    - name: groups
+      type: groups
       # [weight] is used to determine how inventory data should be merged.  The default is 0.
       # Plugins of the same weight can be merged.
-      # Plugins of greater weight will COMPLETELY overwrite data of lower weights that had be compiled prior to their execution.
+      # Plugins of greater weight will COMPLETELY overwrite data of plugins with lower weights that had been compiled prior to their execution.
       #weight: 0
       additional_options:
-              # [grouppath] is an optional path that can be used to include "group-wide" config details.
+              # [grouppath] is required for this plugin, but the existence of group files within the path is not required.
+              # group data is optional data that can be used to include "group-wide" config details.
               # For example a host named dns02.example.com.yml would be seen as belonging to the group "example.com"
               # During builds /etc/waitron/groups/example.com.yml would be searched and have its config details used if found.
               grouppath: /etc/waitron/groups/ 
-
+    - name: file
+      type: file
+      additional_options:
               # [machinepath] is a required path for this plugin.
               # If a build is requested for hostname "dns02.example.com"
               # this path would be searched for dns02.example.com.yml.
               machinepath: /etc/waitron/machines/
+    - name: netbox
+      disabled: True
+      type: netbox
+      source: "https://netbox.example.com/api"
+      auth_token: "some_netbox_api_token"              
 
 #############################################################################
 # New build types can be specified here.                                    #
@@ -49,6 +57,23 @@ build_types:
         params:
             nameservers: "8.8.8.8"    
             os_version_name: "rescue-image"
+    # For "power users," _unknown_ is a special, optional build type that will be invoked when Waitron receives a MAC that it doesn't know about.
+    # After checking all inventory plugins using the incoming MAC, if no matching device is found, it will use the _unknown_ build type.
+    # There is a corresponding [unknownbuild_commands] option below that can be used to run any desired commands when an unknown MAC is seen.
+    # Note that any templating in cmdline or in any build commands will have limited information and should only expect to have "{{ Token }}" available,
+    # which will hold the MAC of the unknown device.
+    # Also, this WILL NOT work well with the file plugin because the file plugin cannot currently search by MAC and will trigger
+    # an _unknown_ for any machine not in build mode if it is the only plugin in use.
+    _unknown_:
+        image_url: http://waitron.example.com:7078/files/
+        kernel: vmlinuz64
+        initrd: corepure64.gz
+        cmdline: " loglevel=3 "
+        stale_build_threshold_secs: 9000
+        params:
+            nameservers: "8.8.8.8"    
+            os_version_name: "discovery-image"
+            
 
 ######################################## HOW DETAILS ARE MERGED ###############################################
 # During builds, the order of merging looks like this [base config (config.yml)] -> [build type] -> [machine] #
@@ -113,6 +138,15 @@ postbuild_commands:
 cancelbuild_commands:
   - command: |
         {% include "/etc/waitron/templates/messages/cancel.j2" %}
+    errors_fatal: true
+    timeout_seconds: 10
+    should_log: false
+
+# [unknownbuild_commands] will be run when only when Waitron receives a pxe request for a MAC it cannot find in any inventory plugin.
+# These will only be run if the "_unknown_" build type has been added to the "build_types" section of the config.
+unknownbuild_commands:
+  - command: |
+        {% include "/etc/waitron/templates/messages/unknown.j2" %}
     errors_fatal: true
     timeout_seconds: 10
     should_log: false

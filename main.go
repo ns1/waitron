@@ -32,7 +32,8 @@ type result struct {
 // @Param hostname  path    string    true    "Hostname"
 // @Param type    	path    string    true    "Build Type"
 // @Success 200    {object} string "Machine config in JSON format."
-// @Failure 404    {object} string "Machine not found"
+// @Failure 404    {object} string "Unable to find host definition for '<hostname>' '<build_type>' '<error>'"
+// @Failure 500    {object} string "Bad machine data for '<hostname>' '<build_type>' '<error>'"
 // @Router /definition/{hostname}/{type} [GET]
 func definitionHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
@@ -45,7 +46,12 @@ func definitionHandler(response http.ResponseWriter, request *http.Request, ps h
 		return
 	}
 
-	result, _ := json.Marshal(m)
+	result, err := json.Marshal(m)
+
+	if err != nil {
+		http.Error(response, fmt.Sprintf("Bad machine data for '%s' '%s'. %s", hostname, btype, err.Error()), 500)
+		return
+	}
 
 	fmt.Fprintf(response, string(result))
 }
