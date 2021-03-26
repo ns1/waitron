@@ -62,18 +62,16 @@ func (p *NetboxInventoryPlugin) PutMachine(m *machine.Machine) error {
 
 func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (*machine.Machine, error) {
 	hostname = strings.ToLower(hostname)
-	hostSlice := strings.Split(hostname, ".")
 
-	m := &machine.Machine{
-		Hostname:  hostname,
-		ShortName: hostSlice[0],
-		Domain:    strings.Join(hostSlice[1:], "."),
+	m, err := machine.New(hostname)
+
+	if err != nil {
+		return nil, err
 	}
 
 	m.Params = make(map[string]string)
 
 	var results map[string]interface{}
-	var err error
 
 	if hostname != "" {
 		results, err = p.queryNetbox(p.settings.Source + "/dcim/interfaces/?device=" + hostname)
@@ -112,20 +110,37 @@ func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (
 		m.Network = append(m.Network, machine.Interface{Name: name, MacAddress: mac})
 		newIface := &m.Network[len(m.Network)-1]
 
+		// We'll need to attach IP addresses to the interface in a little bit.
+		interfaces[id] = newIface
+
 		if zSide, ok := iface["connected_endpoint"].(map[interface{}]interface{}); ok {
 			newIface.ZSideDeviceInterface, _ = zSide["name"].(string)
 			newIface.ZSideDevice, _ = zSide["device"].(map[interface{}]interface{})["name"].(string)
 		}
 
+		if primaryVlan, ok := iface["untagged_vlan"].(map[interface{}]interface{}); ok {
+			newIface.VlanName, _ = primaryVlan["name"].(string)
+			newIface.VlanID, _ = primaryVlan["vid"].(int)
+		}
+
+		/*
+			Matching on just name right now, but might/should switch to looking for name, tag, or maybe even role.
+			In which case, name might not always be "provisioning."
+		*/
 		if name == "provisioning" {
 			// Entirely possible this isn't set.
 			if desc, ok := iface["description"].(string); ok {
 				m.Params["provisioning_zside_interface"] = strings.Split(desc, ";")[0]
 			}
-		}
 
-		// We'll need to attach IP addresses to the interface in a little bit.
-		interfaces[id] = newIface
+			if desc, ok := iface["description"].(string); ok {
+				m.Params["provisioning_zside_interface"] = strings.Split(desc, ";")[0]
+			}
+
+			m.Params["provisioning_vlan"] = newIface.VlanName
+			m.Params["provisioning_vlan_id"] = fmt.Sprintf("%d", newIface.VlanID)
+			m.Params["provisioning_interface"] = name
+		}
 
 	}
 
@@ -182,6 +197,7 @@ func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (
 			if strings.ToLower(iface.Name) == "ipmi" {
 				m.IpmiAddressRaw = addressParts[0]
 				p.Log(fmt.Sprintf("added ipv4 ipmi address to interface %s for %s: %s", iface.Name, hostname, addressParts[0]), config.LogLevelDebug)
+				p.Log(fmt.Sprintf("interface %v", *iface), config.LogLevelDebug)
 			}
 
 			if strings.ToLower(iface.Name) == "provisioning" {

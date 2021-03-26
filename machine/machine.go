@@ -1,6 +1,7 @@
 package machine
 
 import (
+	"strings"
 	"waitron/config"
 )
 
@@ -40,4 +41,17 @@ type Interface struct {
 	ZSideDevice          string     `yaml:"zside_device"`
 	ZSideDeviceInterface string     `yaml:"zside_device_port"`
 	Tags                 []string   `yaml:"tags`
+}
+
+func New(hostname string) (*Machine, error) {
+	hostname = strings.ToLower(hostname)
+	hostSlice := strings.Split(hostname, ".")
+
+	m := &Machine{
+		Hostname:  hostname,
+		ShortName: hostSlice[0],
+		Domain:    strings.Join(hostSlice[1:], "."),
+	}
+
+	return m, nil
 }

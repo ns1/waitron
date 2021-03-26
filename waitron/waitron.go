@@ -60,9 +60,11 @@ type Job struct {
 	Status       string
 	StatusReason string
 
-	BuildTypeName string
-	Machine       *machine.Machine
-	Token         string
+	BuildTypeName        string
+	Machine              *machine.Machine
+	TriggerMacRaw        string // The MAC that actually came in looking for a PXE boot.
+	TriggerMacNormalized string
+	Token                string
 }
 
 type activePlugin struct {
@@ -749,24 +751,33 @@ func (w *Waitron) GetPxeConfig(macaddress string) (PixieConfig, error) {
 
 	// Normalize the MAC
 	r := strings.NewReplacer(":", "", "-", "", ".", "")
-	macaddress = strings.ToLower(r.Replace(macaddress))
+	normMacaddress := strings.ToLower(r.Replace(macaddress))
 
 	// Look up the *Job by MAC
 	w.jobs.RLock()
-	j, found := w.jobs.jobByMAC[macaddress]
+	j, found := w.jobs.jobByMAC[normMacaddress]
 	w.jobs.RUnlock()
 
 	if !found {
 		if uBuild, ok := w.config.BuildTypes["_unknown_"]; ok {
-			return w.getPxeConfigForUnknown(&uBuild, macaddress)
+			return w.getPxeConfigForUnknown(&uBuild, normMacaddress)
 		} else {
-			return PixieConfig{}, fmt.Errorf("job not found for  '%s'", macaddress)
+			return PixieConfig{}, fmt.Errorf("job not found for  '%s'", normMacaddress)
 		}
 	}
 
 	// Build the pxe config based on the compiled machine details.
 
 	pixieConfig := PixieConfig{}
+
+	/*
+		It's entirely possible for multiple requests to come in for the same MAC, either from retries or because pixiecore/dhcp
+		has been set up as "cluster" and you have "duplicate" pxe requests, but only one will ultimately be selected.
+		We'll only want to trigger certain things when we're seeing a PXE for a MAC for the first time, such as when a set a network cards attempt PXE in order.
+
+		Unique is a bit of a lie, though, since e.g. a machine looping endlessly through two network cards would keep toggling this var as it rotates through NICs/MACs
+	*/
+	uniquePxeRequest := false
 
 	var cmdline, imageURL, kernel, initrd string
 
@@ -786,22 +797,52 @@ func (w *Waitron) GetPxeConfig(macaddress string) (PixieConfig, error) {
 
 	j.RUnlock()
 	j.Lock()
-	defer j.Unlock()
+	/*
+		The deferred unlock was removed.  Even though the (read-locking) runBuildCommands call near the end
+		is happening in a go-routine, having it happen while this function is holding a write-lock
+		makes me too nervous.  It just feels too dead-lockish.
+	*/
+
+	if j.TriggerMacRaw != macaddress {
+		uniquePxeRequest = true
+		j.TriggerMacRaw = macaddress
+		j.TriggerMacNormalized = normMacaddress
+	}
 
 	if err != nil {
 		j.Status = "failed"
 		j.StatusReason = "pxe config build failed"
+
+		j.Unlock()
+
 		return pixieConfig, err
 	} else {
 		j.Status = "installing"
 		j.StatusReason = "pxe config sent"
 	}
 
+	j.Unlock()
+
 	imageURL = strings.TrimRight(imageURL, "/")
 
 	pixieConfig.Kernel = imageURL + "/" + kernel
 	pixieConfig.Initrd = []string{imageURL + "/" + initrd}
 	pixieConfig.Cmdline = cmdline
+
+	/*
+		It can be pretty valuable to be able to run commands when a PXE is received,
+		but they shouldn't be allowed to block an install at this point.
+
+		This would probably be good spot where go-routines could leak if a user were to create super-long running commands
+		that don't, or practically don't, timeout.
+	*/
+	if uniquePxeRequest {
+		go func() {
+			if err := w.runBuildCommands(j, j.Machine.PxeEventCommands); err != nil {
+				w.addLog(fmt.Sprintf("pxe-event commands for %s returned errors %v", macaddress, err), config.LogLevelError)
+			}
+		}()
+	}
 
 	return pixieConfig, nil
 }
@@ -938,7 +979,7 @@ func (w *Waitron) GetJobsHistoryBlob() ([]byte, error) {
 	}
 
 	w.addLog(fmt.Sprintf("rebuilding stale history blob cache of %d jobs", len(w.history.jobByToken)), config.LogLevelInfo)
-	w.historyBlobCache = make([]byte, 0, 256*len(w.history.jobByToken))
+	w.historyBlobCache = make([]byte, 1, 256*len(w.history.jobByToken))
 	w.historyBlobCache[0] = '['
 
 	// Each of the jobs in here needs to be RLock'ed as they are processed.

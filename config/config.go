@@ -52,6 +52,7 @@ type BuildType struct {
 	PostBuildCommands    []BuildCommand `yaml:"postbuild_commands,omitempty"`
 	CancelBuildCommands  []BuildCommand `yaml:"cancelbuild_commands,omitempty"`
 	UnknownBuildCommands []BuildCommand `yaml:"unknownbuild_commands,omitempty"`
+	PxeEventCommands     []BuildCommand `yaml:"pxeevent_commands,omitempty"`
 
 	Tags []string `yaml:"tags`
 }

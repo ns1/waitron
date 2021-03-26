@@ -59,12 +59,11 @@ func (p *FileInventoryPlugin) PutMachine(m *machine.Machine) error {
 
 func (p *FileInventoryPlugin) GetMachine(hostname string, macaddress string) (*machine.Machine, error) {
 	hostname = strings.ToLower(hostname)
-	hostSlice := strings.Split(hostname, ".")
 
-	m := &machine.Machine{
-		Hostname:  hostname,
-		ShortName: hostSlice[0],
-		Domain:    strings.Join(hostSlice[1:], "."),
+	m, err := machine.New(hostname)
+
+	if err != nil {
+		return nil, err
 	}
 
 	p.Log(fmt.Sprintf("looking for %s.[yml|yaml] in %s", hostname, p.machinePath), config.LogLevelDebug)
