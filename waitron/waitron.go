@@ -844,6 +844,8 @@ func (w *Waitron) GetPxeConfig(macaddress string) (PixieConfig, error) {
 		}()
 	}
 
+	w.addLog(fmt.Sprintf("PXE config for %s: %v", macaddress, pixieConfig), config.LogLevelDebug)
+
 	return pixieConfig, nil
 }
 
