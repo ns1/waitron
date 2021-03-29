@@ -20,10 +20,42 @@ func init() {
 	}
 }
 
+type netboxInterfaceResults struct {
+	results []struct {
+		id                 int
+		name               string
+		mac_address        string
+		description        string
+		connected_endpoint struct {
+			name   string
+			device struct {
+				id   int
+				name string
+			}
+		}
+		untagged_vlan struct {
+			vid  int
+			name string
+		}
+		tags []struct {
+			name string
+		}
+	}
+}
+
+type netboxIPAddressResults struct {
+	results []struct {
+		family struct {
+			value int
+		}
+		assigned_object_id int
+		address            string
+	}
+}
+
 type annotatedIface struct {
-	iface          *machine.Interface
-	isIpmi         bool
-	isProvisioning bool
+	iface  *machine.Interface
+	isIpmi bool
 }
 
 type NetboxInventoryPlugin struct {
@@ -111,8 +143,6 @@ func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (
 		name := iface["name"].(string)
 		mac, ok := iface["mac_address"].(string)
 
-		isProvisioningIface := false
-
 		// MAC is not required on all interfaces in netbox.
 		if !ok {
 			mac = ""
@@ -140,25 +170,12 @@ func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (
 					if tagName, ok := tag["name"].(string); ok {
 						newIface.Tags = append(newIface.Tags, tagName)
 
-						if tagName == "ipmi" {
+						if tagName == "waitron_ipmi" {
 							annotatedInterfaces[id].isIpmi = true
-						} else if tagName == "provisioning" {
-							annotatedInterfaces[id].isProvisioning = true
 						}
 					}
 				}
 			}
-		}
-
-		if isProvisioningIface {
-			// Entirely possible this isn't set.
-			if desc, ok := iface["description"].(string); ok {
-				m.Params["provisioning_zside_interface"] = strings.Split(desc, ";")[0]
-			}
-
-			m.Params["provisioning_vlan"] = newIface.VlanName
-			m.Params["provisioning_vlan_id"] = fmt.Sprintf("%d", newIface.VlanID)
-			m.Params["provisioning_interface"] = name
 		}
 
 	}
@@ -219,15 +236,8 @@ func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (
 				p.Log(fmt.Sprintf("interface %v", *iface), config.LogLevelDebug)
 			}
 
-			if annotatedInterfaces[iface_id].isProvisioning {
-				p.Log(fmt.Sprintf("added ipv4 provisioning details to params %s", hostname), config.LogLevelDebug)
-				m.Params["provisioning_address"] = addressParts[0]
-				m.Params["provisioning_netmask"] = netmask
-				m.Params["provisioning_cidr"] = addressParts[1]
-			}
-
 			if iface.Gateway4 == "" {
-				gwResults, err := p.queryNetbox(p.settings.Source + "/ipam/ip-addresses/?tag=gateway&parent=" + address)
+				gwResults, err := p.queryNetbox(p.settings.Source + "/ipam/ip-addresses/?tag=waitron_gateway&parent=" + address)
 
 				if err != nil {
 					p.Log(fmt.Sprintf("no gateway details found for '%s' for interface %s", address, iface.Name), config.LogLevelWarning)
@@ -270,15 +280,8 @@ func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (
 				m.IpmiAddressRaw = addressParts[0]
 			}
 
-			if annotatedInterfaces[iface_id].isProvisioning {
-				p.Log(fmt.Sprintf("added ipv4 provisioning details to params %s", hostname), config.LogLevelDebug)
-				m.Params["provisioning_address"] = addressParts[0]
-				m.Params["provisioning_netmask"] = netmask
-				m.Params["provisioning_cidr"] = addressParts[1]
-			}
-
 			if iface.Gateway6 == "" {
-				gwResults, err := p.queryNetbox(p.settings.Source + "/ipam/ip-addresses/?tag=gateway&parent=" + address)
+				gwResults, err := p.queryNetbox(p.settings.Source + "/ipam/ip-addresses/?tag=waitron_gateway&parent=" + address)
 
 				if err != nil {
 					p.Log(fmt.Sprintf("no gateway details found for '%s' for interface %s", address, iface.Name), config.LogLevelWarning)
