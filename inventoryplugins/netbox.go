@@ -172,13 +172,13 @@ func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (
 
 	annotatedInterfaces := make(map[int]*annotatedIface)
 
-	ifaces := results.Results
+	netboxIfaces := results.Results
 
 	// Making sure the array underneath doesn't change so that I can just grab references to the entries as needed.
-	m.Network = make([]machine.Interface, len(ifaces))
+	m.Network = make([]machine.Interface, len(netboxIfaces))
 
 	// Grab all the interfaces for the device
-	for idx, iface := range ifaces {
+	for idx, iface := range netboxIfaces {
 
 		p.Log(fmt.Sprintf("found netbox interface: %v", iface), config.LogLevelDebug)
 

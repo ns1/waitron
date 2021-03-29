@@ -69,6 +69,7 @@ type MachineInventoryPluginSettings struct {
 	Weight            int                    `yaml:"weight"`
 	WriteEnabled      bool                   `yaml:"writable"`
 	Disabled          bool                   `yaml:"disabled"`
+	SupplementalOnly  bool                   `yaml:"supplemental_only"`
 }
 
 // Config is our global configuration file

@@ -20,6 +20,9 @@ history_cache_seconds: 20
 inventory_plugins:
     - name: groups
       type: groups
+      # Only use the details return from this plugin if the device is found in another plugig.
+      # I.e., if this plugin is the only place we found the machine, treat it as not found.
+      supplemental_only: True
       # [weight] is used to determine how inventory data should be merged.  The default is 0.
       # Plugins of the same weight can be merged.
       # Plugins of greater weight will COMPLETELY overwrite data of plugins with lower weights that had been compiled prior to their execution.

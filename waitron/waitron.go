@@ -166,10 +166,13 @@ func (w *Waitron) GetLogger() WaitronLogger {
 	Create an array of plugin instances.  Only enabled/active plugins will be loaded.
 */
 func (w *Waitron) initPlugins() error {
-	for _, cp := range w.config.MachineInventoryPlugins {
+	for idx := 0; idx < len(w.config.MachineInventoryPlugins); idx++ {
+
+		cp := &(w.config.MachineInventoryPlugins[idx])
+
 		if !cp.Disabled {
 
-			p, err := inventoryplugins.GetPlugin(cp.Name, &cp, w.config, w.addLog)
+			p, err := inventoryplugins.GetPlugin(cp.Name, cp, w.config, w.addLog)
 
 			if err != nil {
 				return err
@@ -179,7 +182,7 @@ func (w *Waitron) initPlugins() error {
 				return err
 			}
 
-			w.activePlugins = append(w.activePlugins, activePlugin{plugin: p, settings: &cp})
+			w.activePlugins = append(w.activePlugins, activePlugin{plugin: p, settings: cp})
 		}
 	}
 	return nil
@@ -490,12 +493,19 @@ func (w *Waitron) getMergedInventoryMachine(hostname string, mac string) (*machi
 				continue
 			}
 
-			anyFound = true
+			/*
+				We found details, but we've been told not to treat them as inidicitive of finding a true machine definition.
+				I.e., the user probably wants this treated as supplmental information if a machine is found in some other plugin.
+			*/
+			if !ap.settings.SupplementalOnly {
+				anyFound = true
+			}
 		}
 	}
 
 	// Bail out if we didn't find the machine anywhere.
 	if !anyFound {
+		w.addLog(fmt.Sprintf("machine not found in any non-supplemental plugin"), config.LogLevelDebug)
 		return nil, nil
 	}
 
