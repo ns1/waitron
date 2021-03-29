@@ -54,7 +54,8 @@ type BuildType struct {
 	UnknownBuildCommands []BuildCommand `yaml:"unknownbuild_commands,omitempty"`
 	PxeEventCommands     []BuildCommand `yaml:"pxeevent_commands,omitempty"`
 
-	Tags []string `yaml:"tags`
+	Tags        []string `yaml:"tags`
+	Description string   `yaml:"description`
 }
 
 type MachineInventoryPluginSettings struct {

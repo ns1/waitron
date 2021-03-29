@@ -21,36 +21,39 @@ func init() {
 }
 
 type netboxInterfaceResults struct {
-	results []struct {
-		id                 int
-		name               string
-		mac_address        string
-		description        string
-		connected_endpoint struct {
-			name   string
-			device struct {
-				id   int
-				name string
-			}
-		}
-		untagged_vlan struct {
-			vid  int
-			name string
-		}
-		tags []struct {
-			name string
-		}
-	}
+	Results []struct {
+		ID           int    `yaml:"id"`
+		Name         string `yaml:"name"`
+		MacAddress   string `yaml:"mac_address"`
+		Description  string `yaml:"description"`
+		ParentDevice struct {
+			Name string `yaml:"name"`
+		} `yaml:"device"`
+		ConnectedEndpoint struct {
+			Name   string `yaml:"name"`
+			Device struct {
+				ID   int    `yaml:"id"`
+				Name string `yaml:"name"`
+			} `yaml:"device"`
+		} `yaml:"connected_endpoint"`
+		UntaggedVlan struct {
+			Vid  int    `yaml:"vid"`
+			Name string `yaml:"name"`
+		} `yaml:"untagged_vlan"`
+		Tags []struct {
+			Name string `yaml:"name"`
+		} `yaml:"tags"`
+	} `yaml:"results"`
 }
 
-type netboxIPAddressResults struct {
-	results []struct {
-		family struct {
-			value int
-		}
-		assigned_object_id int
-		address            string
-	}
+type netboxIpAddressResults struct {
+	Results []struct {
+		Family struct {
+			Value int `yaml:"value"`
+		} `yaml:"family"`
+		AssignedObjectID int    `yaml:"assigned_object_id"`
+		Address          string `yaml:"address"`
+	} `yaml:"results"`
 }
 
 type annotatedIface struct {
@@ -63,7 +66,8 @@ type NetboxInventoryPlugin struct {
 	waitronConfig *config.Config
 	Log           func(string, config.LogLevel) bool
 
-	machinePath string
+	enabledAssetsFilter string
+	machinePath         string
 }
 
 func NewNetboxInventoryPlugin(s *config.MachineInventoryPluginSettings, c *config.Config, lf func(string, config.LogLevel) bool) MachineInventoryPlugin {
@@ -107,209 +111,184 @@ func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (
 		return nil, err
 	}
 
+	if _, ok := p.settings.AdditionalOptions["enabled_assets_only"]; ok {
+		if enabledAssetsOnly, ok := p.settings.AdditionalOptions["enabled_assets_only"].(bool); ok && enabledAssetsOnly {
+			p.enabledAssetsFilter = "&enabled=true"
+		}
+	}
+
 	m.Params = make(map[string]string)
 
-	var results map[string]interface{}
+	// Let hostname win, but if it's not present, then we'll try to pull it from an interface that matchces the MAC passed. in.
+	if hostname == "" && macaddress != "" {
 
-	if hostname != "" {
-		results, err = p.queryNetbox(p.settings.Source + "/dcim/interfaces/?device=" + hostname)
+		macResults := &netboxInterfaceResults{}
+
+		response, err := p.queryNetbox(p.settings.Source + "/dcim/interfaces/?mac_address=" + macaddress)
+		p.Log(fmt.Sprintf("retrieved interface data from netbox: %v", string(response)), config.LogLevelDebug)
 
 		if err != nil {
 			return nil, err
 		}
-	} else if macaddress != "" {
-		// Fill in!
+
+		if err = yaml.Unmarshal(response, macResults); err != nil {
+			return nil, err
+		}
+
+		// It wasn't an error, but it didn't result in finding a hostname.
+		if macResults.Results[0].ParentDevice.Name == "" {
+			p.Log(fmt.Sprintf("MAC '%s' used for netbox query, but no related hostname found", macaddress), config.LogLevelInfo)
+			return nil, nil
+		}
+		hostname = macResults.Results[0].ParentDevice.Name
 	}
 
-	p.Log(fmt.Sprintf("retrieved interface data from netbox: %v", results), config.LogLevelDebug)
+	results := &netboxInterfaceResults{}
+
+	response, err := p.queryNetbox(p.settings.Source + "/dcim/interfaces/?device=" + hostname)
+	p.Log(fmt.Sprintf("retrieved interface data from netbox: %v", string(response)), config.LogLevelDebug)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err = yaml.Unmarshal(response, results); err != nil {
+		return nil, err
+	}
+
+	/*
+		We're implicitly saying that netbox as a datasource is only meant to provide a machine
+		that has at least one interface.
+		This doesn't have to be the case, but the only real job of this plugin is to provide interface/IP details.
+		If they don't exist, then it shouldn't return a machine.
+	*/
+
+	if len(results.Results) == 0 {
+		p.Log(fmt.Sprintf("no matching interface results for netbox query with '%s'", results), config.LogLevelInfo)
+		return nil, nil
+	}
+
+	p.Log(fmt.Sprintf("have interface structure from netbox interface: %v", results), config.LogLevelDebug)
 
 	annotatedInterfaces := make(map[int]*annotatedIface)
 
-	ifaces, ok := results["results"].([]interface{})
-
-	if !ok {
-		return nil, fmt.Errorf("failed to assert interfaces list")
-	}
+	ifaces := results.Results
 
 	// Making sure the array underneath doesn't change so that I can just grab references to the entries as needed.
 	m.Network = make([]machine.Interface, len(ifaces))
 
 	// Grab all the interfaces for the device
-	for idx, i := range ifaces {
+	for idx, iface := range ifaces {
 
-		iface := i.(map[interface{}]interface{})
+		p.Log(fmt.Sprintf("found netbox interface: %v", iface), config.LogLevelDebug)
 
-		id := iface["id"].(int)
-		name := iface["name"].(string)
-		mac, ok := iface["mac_address"].(string)
-
-		// MAC is not required on all interfaces in netbox.
-		if !ok {
-			mac = ""
-		}
-
-		m.Network[idx] = machine.Interface{Name: name, MacAddress: mac}
+		m.Network[idx] = machine.Interface{Name: iface.Name, MacAddress: iface.MacAddress}
 		newIface := &m.Network[idx]
 
 		// We'll need to attach IP addresses to the interface in a little bit.
-		annotatedInterfaces[id] = &annotatedIface{iface: newIface}
+		annotatedInterfaces[iface.ID] = &annotatedIface{iface: newIface}
 
-		if zSide, ok := iface["connected_endpoint"].(map[interface{}]interface{}); ok {
-			newIface.ZSideDeviceInterface, _ = zSide["name"].(string)
-			newIface.ZSideDevice, _ = zSide["device"].(map[interface{}]interface{})["name"].(string)
-		}
+		newIface.ZSideDeviceInterface = iface.ConnectedEndpoint.Name
+		newIface.ZSideDevice = iface.ConnectedEndpoint.Device.Name
 
-		if primaryVlan, ok := iface["untagged_vlan"].(map[interface{}]interface{}); ok {
-			newIface.VlanName, _ = primaryVlan["name"].(string)
-			newIface.VlanID, _ = primaryVlan["vid"].(int)
-		}
+		newIface.VlanName = iface.UntaggedVlan.Name
+		newIface.VlanID = iface.UntaggedVlan.Vid
+		newIface.Description = iface.Description
 
-		if tags, ok := iface["tags"].([]interface{}); ok {
-			for _, sTag := range tags {
-				if tag, ok := sTag.(map[interface{}]interface{}); ok {
-					if tagName, ok := tag["name"].(string); ok {
-						newIface.Tags = append(newIface.Tags, tagName)
+		for _, tag := range iface.Tags {
 
-						if tagName == "waitron_ipmi" {
-							annotatedInterfaces[id].isIpmi = true
-						}
-					}
-				}
+			newIface.Tags = append(newIface.Tags, tag.Name)
+
+			if tag.Name == "waitron_ipmi" {
+				annotatedInterfaces[iface.ID].isIpmi = true
+				p.Log(fmt.Sprintf("found ipmi interface: %v", m.Network[idx]), config.LogLevelDebug)
 			}
 		}
 
 	}
 
-	if hostname != "" {
-		results, err = p.queryNetbox(p.settings.Source + "/ipam/ip-addresses/?device=" + hostname)
+	ipResults := &netboxIpAddressResults{}
 
-		if err != nil {
-			return nil, err
-		}
-	} else if macaddress != "" {
-		// Fill in! OR with our first hostname vs mac if-block, use mac to trace back to a hostname and then set it at that point.
+	response, err = p.queryNetbox(p.settings.Source + "/ipam/ip-addresses/?device=" + hostname)
+
+	if err != nil {
+		return nil, err
 	}
 
-	p.Log(fmt.Sprintf("retrieved ip address data from netbox: %v", results), config.LogLevelDebug)
-
-	addrs, ok := results["results"].([]interface{})
-
-	if !ok {
-		return nil, fmt.Errorf("failed to assert ip addresses list")
+	if err = yaml.Unmarshal(response, ipResults); err != nil {
+		return nil, err
 	}
+
+	p.Log(fmt.Sprintf("retrieved ip address data from netbox: %v", ipResults), config.LogLevelDebug)
+
+	addrs := ipResults.Results
 
 	// Grab all the ip addresses for the device
-	for _, a := range addrs {
+	for _, addr := range addrs {
 
-		addr, ok := a.(map[interface{}]interface{})
+		annotatedIface := annotatedInterfaces[addr.AssignedObjectID]
+		iface := annotatedIface.iface
 
-		if !ok {
-			return nil, fmt.Errorf("failed to assert ip address")
-		}
-
-		iface_id := addr["assigned_object_id"].(int)
-		address := addr["address"].(string)
-		family := addr["family"].(map[interface{}]interface{})["value"].(int)
-
-		iface := annotatedInterfaces[iface_id].iface
-
-		_, ipNet, err := net.ParseCIDR(address)
+		_, ipNet, err := net.ParseCIDR(addr.Address)
 
 		if err != nil {
-			p.Log(fmt.Sprintf("skipping unparseable address '%s' for interface %s", address, iface.Name), config.LogLevelWarning)
+			p.Log(fmt.Sprintf("skipping unparseable address '%s' for interface %s", addr.Address, iface.Name), config.LogLevelWarning)
 			continue
 		}
 
+		addressParts := strings.Split(addr.Address, "/")
+
 		// Watch out!  We're assuming there's only a single IPMI address of either v4 or v6.
 		// Operators can always get around this by passing in IPMI details other ways.
-		if family == 4 {
-			addressParts := strings.Split(address, "/")
+		if annotatedIface.isIpmi {
+			m.IpmiAddressRaw = addressParts[0]
+			p.Log(fmt.Sprintf("added ipmi address to interface %s for %s: %s", iface.Name, hostname, addressParts[0]), config.LogLevelDebug)
+			p.Log(fmt.Sprintf("interface %v", *iface), config.LogLevelDebug)
+		}
+
+		if addr.Family.Value == 4 {
 			netmask := fmt.Sprintf("%d.%d.%d.%d", ipNet.Mask[0], ipNet.Mask[1], ipNet.Mask[2], ipNet.Mask[3])
 
 			// Update the list of addresses in the related interface
 			iface.Addresses4 = append(iface.Addresses4, machine.IPConfig{IPAddress: addressParts[0], Cidr: addressParts[1], Netmask: netmask})
 			p.Log(fmt.Sprintf("added ipv4 address to interface %s for %s: %s", iface.Name, hostname, addressParts[0]), config.LogLevelDebug)
 
-			if annotatedInterfaces[iface_id].isIpmi {
-				m.IpmiAddressRaw = addressParts[0]
-				p.Log(fmt.Sprintf("added ipv4 ipmi address to interface %s for %s: %s", iface.Name, hostname, addressParts[0]), config.LogLevelDebug)
-				p.Log(fmt.Sprintf("interface %v", *iface), config.LogLevelDebug)
-			}
-
 			if iface.Gateway4 == "" {
-				gwResults, err := p.queryNetbox(p.settings.Source + "/ipam/ip-addresses/?tag=waitron_gateway&parent=" + address)
 
-				if err != nil {
-					p.Log(fmt.Sprintf("no gateway details found for '%s' for interface %s", address, iface.Name), config.LogLevelWarning)
-				}
+				gw, err := p.getGateway(iface, addr.Address)
 
-				if gateways, ok := gwResults["results"].([]interface{}); ok {
-					if len(gateways) > 1 {
-						p.Log(fmt.Sprintf("multiple gateways found for '%s' for interface %s", address, iface.Name), config.LogLevelWarning)
-					}
-
-					for idx := 0; idx < len(gateways) && iface.Gateway4 == ""; idx++ {
-						gateway, ok := gateways[idx].(map[interface{}]interface{})
-						if !ok {
-							p.Log(fmt.Sprintf("gateway object #%d found for '%s' for interface %s is the wrong structure", idx, address, iface.Name), config.LogLevelWarning)
-							continue
-						}
-
-						iface.Gateway4, _ = gateway["address"].(string)
-
-						if iface.Gateway4 == "" {
-							p.Log(fmt.Sprintf("no good gateway address in gateway #%d found for '%s' for interface %s", idx, address, iface.Name), config.LogLevelWarning)
-							continue
-						}
-
-						iface.Gateway4 = strings.Split(iface.Gateway4, "/")[0]
+				if gw == "" || err != nil {
+					p.Log(fmt.Sprintf("no gateway address found for '%s' for interface %s: %v", addr.Address, iface.Name, err), config.LogLevelWarning)
+					if err != nil {
+						return nil, err
 					}
 				}
+				iface.Gateway4 = gw
 			}
 
-		} else if family == 6 {
-			addressParts := strings.Split(address, "/")
-			netmask := fmt.Sprintf("%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x", ipNet.Mask[0], ipNet.Mask[1], ipNet.Mask[2], ipNet.Mask[3], ipNet.Mask[4], ipNet.Mask[5], ipNet.Mask[6], ipNet.Mask[7], ipNet.Mask[8], ipNet.Mask[9], ipNet.Mask[10], ipNet.Mask[11], ipNet.Mask[12], ipNet.Mask[13], ipNet.Mask[14], ipNet.Mask[15])
+		} else if addr.Family.Value == 6 {
+			netmask := fmt.Sprintf("%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x",
+				ipNet.Mask[0], ipNet.Mask[1], ipNet.Mask[2], ipNet.Mask[3],
+				ipNet.Mask[4], ipNet.Mask[5], ipNet.Mask[6], ipNet.Mask[7],
+				ipNet.Mask[8], ipNet.Mask[9], ipNet.Mask[10], ipNet.Mask[11],
+				ipNet.Mask[12], ipNet.Mask[13], ipNet.Mask[14], ipNet.Mask[15])
 
 			// Update the list of addresses in the related interface
 			iface.Addresses6 = append(iface.Addresses6, machine.IPConfig{IPAddress: addressParts[0], Cidr: addressParts[1], Netmask: netmask})
 			p.Log(fmt.Sprintf("added ipv6 address to interface %s for %s: %s", iface.Name, hostname, addressParts[0]), config.LogLevelDebug)
 
-			if annotatedInterfaces[iface_id].isIpmi {
-				p.Log(fmt.Sprintf("added ipv6 ipmi address to interface %s for %s: %s", iface.Name, hostname, addressParts[0]), config.LogLevelDebug)
-				m.IpmiAddressRaw = addressParts[0]
-			}
-
 			if iface.Gateway6 == "" {
-				gwResults, err := p.queryNetbox(p.settings.Source + "/ipam/ip-addresses/?tag=waitron_gateway&parent=" + address)
 
-				if err != nil {
-					p.Log(fmt.Sprintf("no gateway details found for '%s' for interface %s", address, iface.Name), config.LogLevelWarning)
-				}
+				gw, err := p.getGateway(iface, addr.Address)
 
-				if gateways, ok := gwResults["results"].([]interface{}); ok {
-					if len(gateways) > 1 {
-						p.Log(fmt.Sprintf("multiple gateways found for '%s' for interface %s", address, iface.Name), config.LogLevelWarning)
-					}
-
-					for idx := 0; idx < len(gateways) && iface.Gateway6 == ""; idx++ {
-						gateway, ok := gateways[idx].(map[interface{}]interface{})
-						if !ok {
-							p.Log(fmt.Sprintf("gateway object #%d found for '%s' for interface %s is the wrong structure", idx, address, iface.Name), config.LogLevelWarning)
-							continue
-						}
-
-						iface.Gateway6, _ = gateway["address"].(string)
-
-						if iface.Gateway6 == "" {
-							p.Log(fmt.Sprintf("no good gateway address in gateway #%d found for '%s' for interface %s", idx, address, iface.Name), config.LogLevelWarning)
-							continue
-						}
-						iface.Gateway6 = strings.Split(iface.Gateway6, "/")[0]
+				if gw == "" || err != nil {
+					p.Log(fmt.Sprintf("no gateway address found for '%s' for interface %s: %v", addr.Address, iface.Name, err), config.LogLevelWarning)
+					if err != nil {
+						return nil, err
 					}
 				}
+				iface.Gateway6 = gw
 			}
-
 		}
 
 	}
@@ -318,7 +297,39 @@ func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (
 
 }
 
-func (p *NetboxInventoryPlugin) queryNetbox(q string) (map[string]interface{}, error) {
+func (p *NetboxInventoryPlugin) getGateway(iface *machine.Interface, addr string) (string, error) {
+
+	gwResponse, err := p.queryNetbox(p.settings.Source + "/ipam/ip-addresses/?tag=waitron_gateway&parent=" + addr)
+
+	if err != nil {
+		return "", err
+	}
+
+	gwResults := &netboxIpAddressResults{}
+
+	if err := yaml.Unmarshal(gwResponse, gwResults); err != nil {
+		return "", err
+	}
+
+	gateways := gwResults.Results
+	if len(gateways) > 1 {
+		p.Log(fmt.Sprintf("multiple gateways found for '%s' for interface %s", addr, iface.Name), config.LogLevelWarning)
+	} else if len(gateways) == 0 {
+		p.Log(fmt.Sprintf("no gateways found for '%s' for interface %s", addr, iface.Name), config.LogLevelWarning)
+		return "", nil
+	}
+
+	for _, gateway := range gateways {
+		if gateway.Address != "" {
+			return strings.Split(gateway.Address, "/")[0], nil
+		}
+	}
+	return "", nil
+}
+
+func (p *NetboxInventoryPlugin) queryNetbox(q string) ([]byte, error) {
+
+	q = q + p.enabledAssetsFilter
 
 	p.Log(fmt.Sprintf("going to query %s", q), config.LogLevelDebug)
 
@@ -356,11 +367,5 @@ func (p *NetboxInventoryPlugin) queryNetbox(q string) (map[string]interface{}, e
 		return nil, err
 	}
 
-	i := make(map[string]interface{})
-
-	if err = yaml.Unmarshal(response, i); err != nil {
-		return nil, err
-	}
-
-	return i, nil
+	return response, nil
 }

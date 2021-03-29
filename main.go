@@ -226,14 +226,14 @@ func cleanHistory(response http.ResponseWriter, request *http.Request, ps httpro
 // @Summary Dictionary with kernel, intrd(s) and commandline for pixiecore
 // @Param macaddr    path    string    true    "MacAddress"
 // @Success 200    {object} string "Dictionary with kernel, intrd(s) and commandline for pixiecore"
-// @Failure 500    {object} string "failed to get pxe config"
+// @Failure 500    {object} string "failed to get pxe config: <error>"
 // @Router /v1/boot/{macaddr} [GET]
 func pixieHandler(response http.ResponseWriter, request *http.Request, ps httprouter.Params, w *waitron.Waitron) {
 
 	pxeconfig, err := w.GetPxeConfig(ps.ByName("macaddr"))
 
 	if err != nil {
-		http.Error(response, "failed to get pxe config", 500)
+		http.Error(response, "failed to get pxe config: "+err.Error(), 500)
 		return
 	}
 

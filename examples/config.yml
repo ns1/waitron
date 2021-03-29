@@ -41,7 +41,9 @@ inventory_plugins:
       disabled: True
       type: netbox
       source: "https://netbox.example.com/api"
-      auth_token: "some_netbox_api_token"              
+      auth_token: "some_netbox_api_token"  
+      additional_options:
+        enabled_assets_only: False # Do you want to restrict netbox query results to enabled devices/interfaces/IPs only?
 
 #############################################################################
 # New build types can be specified here.                                    #

@@ -22,10 +22,11 @@ type Machine struct {
 }
 
 type IPConfig struct {
-	IPAddress string   `yaml:"ipaddress"`
-	Netmask   string   `yaml:"netmask"`
-	Cidr      string   `yaml:"cidr"`
-	Tags      []string `yaml:"tags`
+	IPAddress   string   `yaml:"ipaddress"`
+	Netmask     string   `yaml:"netmask"`
+	Cidr        string   `yaml:"cidr"`
+	Tags        []string `yaml:"tags`
+	Description string   `yaml:"description"`
 }
 
 // Interface Configuration
@@ -41,6 +42,7 @@ type Interface struct {
 	ZSideDevice          string     `yaml:"zside_device"`
 	ZSideDeviceInterface string     `yaml:"zside_device_port"`
 	Tags                 []string   `yaml:"tags`
+	Description          string     `yaml:"description"`
 }
 
 func New(hostname string) (*Machine, error) {
