@@ -74,6 +74,7 @@ type MachineInventoryPluginSettings struct {
 
 // Config is our global configuration file
 type Config struct {
+	TempPath        string `yaml:"temp_path"`
 	TemplatePath    string `yaml:"templatepath,omitempty"`
 	GroupPath       string `yaml:"grouppath,omitempty"`
 	StaticFilesPath string `yaml:"staticspath,omitempty"`

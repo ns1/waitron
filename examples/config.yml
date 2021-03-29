@@ -1,6 +1,10 @@
 # The URL of your Waitron service
 baseurl: http://waitron.example.com:7078
 
+# A directory that can be used by Waitron and plugins for temporary data/files.
+# Plugins _should_ respect this setting.
+temp_path: /tmp
+
 # During an active build, anything in here can be requested and will be rendered and returned in the API response.
 # preseed/cloud-init, finish, and any other templates used in your build should go here.
 templatepath: /etc/waitron/templates

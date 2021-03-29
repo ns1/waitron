@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -281,7 +282,29 @@ func (w *Waitron) checkForStaleJobs() {
 	This should ensure that even commands that spawn child processes are cleaned up correctly, along with their children.
 */
 func (w *Waitron) timedCommandOutput(timeout time.Duration, command string) ([]byte, error) {
-	cmd := exec.Command("bash", "-c", command)
+
+	tmpfile, err := ioutil.TempFile(w.config.TempPath, "waitron.timedCommandOutput")
+	if err != nil {
+		return []byte{}, err
+	}
+
+	defer os.Remove(tmpfile.Name())
+
+	if _, err = tmpfile.Write([]byte(command)); err != nil {
+		return []byte{}, err
+	}
+
+	if err = tmpfile.Close(); err != nil {
+		return []byte{}, err
+	}
+
+	if err = os.Chmod(tmpfile.Name(), 0700); err != nil {
+		return []byte{}, err
+	}
+
+	// Fair credit: Decided to migrate to a compact version of github user abh's idea for a temp file vs straight to bash -c.
+	// 				Not as nice for simple commands but more pleasant for large scripts.
+	cmd := exec.Command(tmpfile.Name())
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	outP, err := cmd.StdoutPipe() // Set up the stdout pipe
