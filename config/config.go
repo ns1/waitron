@@ -58,6 +58,11 @@ type BuildType struct {
 	Description string   `yaml:"description`
 }
 
+/*
+	All the wacky marshal/unmarshal stuff being done internall uses the yaml lib,
+	and we only start doing JSON when we want to respond to API calls.
+	That means, for now, we can easily hide password values with a custom MarshalJSON.
+*/
 type Password string
 
 func (pw *Password) MarshalJSON() ([]byte, error) {
