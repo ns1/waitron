@@ -2,7 +2,7 @@
 The original Waitron, found on the version 1.0.0 branch in this repo, was originally written by [jhaals](https://github.com/jhaals).
 We at NS1 needed an internal build system that would allow us to meet a specific set of requirements and found [pixiecore](https://github.com/danderson/pixiecore), and eventually Waitron in an unmaintained state.  Jhaals was kind enough to let NS1 take over the project, and we've continued maintaining it since.
 
-The 2.0.0 branch of this repo still has a large portion of the original from Jhaals, with a few additions we needed at the time.  However, the current main branch (representing post 2.0.0) is an almost complete rewrite of the original Waitron code.
+The 2.0.0 branch of this repo still has a large portion of the original from Jhaals, with a few additions we needed at the time.  However, the current main branch (representing post 2.0.0) is an almost complete rewrite of the original Waitron code, but the spirit of the original Waitron lives on!
 
 
 # Waitron
