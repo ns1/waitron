@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -86,43 +85,6 @@ type Waitron struct {
 	activePlugins []activePlugin
 
 	logs chan string
-}
-
-func FilterRegexReplace(in *pongo2.Value, inR *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
-
-	s := in.String()
-	rgxRpl, ok := inR.Interface().([]string)
-
-	if !ok {
-		return in, nil
-	}
-
-	re, err := regexp.Compile(rgxRpl[0])
-
-	if err != nil {
-		return pongo2.AsValue(""), &pongo2.Error{Sender: "filter:regex_replace", OrigError: err}
-	}
-
-	return pongo2.AsValue(re.ReplaceAllString(s, rgxRpl[1])), nil
-}
-
-func FilterFromYaml(in *pongo2.Value, param *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
-
-	s := in.String()
-
-	out := make(map[interface{}]interface{})
-
-	if err := yaml.Unmarshal([]byte(s), out); err != nil {
-		return nil, &pongo2.Error{Sender: "filter:from_yaml", OrigError: err}
-	}
-
-	return pongo2.AsSafeValue(out), nil
-}
-
-func init() {
-
-	pongo2.RegisterFilter("regex_replace", FilterRegexReplace)
-	pongo2.RegisterFilter("from_yaml", FilterFromYaml)
 }
 
 func New(c *config.Config) *Waitron {
