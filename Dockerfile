@@ -2,9 +2,9 @@ FROM golang:1.15-buster as builder
 
 ENV GOPATH=/opt/go
 
-RUN mkdir -p /opt/go/src/github.com/ns1/waitron \
-    && git clone https://github.com/ns1/waitron.git /opt/go/src/github.com/ns1/waitron \
-    && cd /opt/go/src/github.com/ns1/waitron \
+RUN mkdir -p /opt/go/src/github.com/ns1/waitron
+COPY . /opt/go/src/github.com/ns1/waitron/
+RUN cd /opt/go/src/github.com/ns1/waitron \
     && go build -o bin/waitron . \
     && mv bin/waitron /usr/local/bin/waitron
 

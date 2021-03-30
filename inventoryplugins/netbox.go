@@ -164,7 +164,7 @@ func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (
 	*/
 
 	if len(results.Results) == 0 {
-		p.Log(fmt.Sprintf("no matching interface results for netbox query with '%s'", results), config.LogLevelInfo)
+		p.Log(fmt.Sprintf("no matching interface results for netbox query with '%v'", results), config.LogLevelInfo)
 		return nil, nil
 	}
 
@@ -346,7 +346,7 @@ func (p *NetboxInventoryPlugin) queryNetbox(q string) ([]byte, error) {
 		return nil, err
 	}
 
-	req.Header.Add("Authorization", "Token "+p.settings.AuthToken)
+	req.Header.Add("Authorization", "Token "+string(p.settings.AuthToken))
 
 	resp, err := client.Do(req)
 
