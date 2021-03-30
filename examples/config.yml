@@ -43,12 +43,23 @@ inventory_plugins:
               # [machinepath] is a required path for this plugin.
               # If a build is requested for hostname "dns02.example.com"
               # this path would be searched for dns02.example.com.yml.
-              machinepath: /etc/waitron/machines/
+              machinepath: /etc/waitron/machines/              
+
+      # type:netbox will let you pull inventory data from a netbox API server.
+      # It's possible to tag things in netbox to have the plugin attempt to fill out fields for you.
+      # The tag waitron_gateway on an IP address will let the plugin attempt to set the Gateway4 and Gateway6 values for the interface in machine.Network[].
+      # For example, you could then access it in a template with {{ machine.Network[0].Gateway6 }}
+      # The tag waitron_ipmi on an interface in netbox will let the plugin pull any attached IP addresses on the interface
+      # to populate the machine.IpmiAddressRaw value for use in templates
+      # The plugin will also attach any IP and interface tags to the Tags value of that object in Waitron for use in templates. Example: {% if "fallback_interface" in machine.Network[0].Tags %}
+      # The plugin will also store the netbox "rendered config context" of the machine in machine.Params.config_context
+      # which can then be converted to a template object with Waitron's custom to_yaml filter.
+      # {% with configcontext = machine.Params.config_context|from_yaml %} {{ configcontext.some_netbox_context_value }} {% endwith %}
     - name: netbox
       disabled: True
       type: netbox
       source: "https://netbox.example.com/api"
-      auth_token: "some_netbox_api_token"  
+      auth_token: "some_netbox_api_token"        
       additional_options:
         enabled_assets_only: False # Do you want to restrict netbox query results to enabled devices/interfaces/IPs only?
 

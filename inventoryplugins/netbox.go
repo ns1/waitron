@@ -56,6 +56,12 @@ type netboxIpAddressResults struct {
 	} `yaml:"results"`
 }
 
+type netboxDeviceResults struct {
+	Results []struct {
+		ConfigContext map[string]interface{} `yaml:"config_context"`
+	} `yaml:"results"`
+}
+
 type annotatedIface struct {
 	iface  *machine.Interface
 	isIpmi bool
@@ -107,6 +113,8 @@ func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (
 
 	m, err := machine.New(hostname)
 
+	m.Params = make(map[string]string)
+
 	if err != nil {
 		return nil, err
 	}
@@ -116,8 +124,6 @@ func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (
 			p.enabledAssetsFilter = "&enabled=true"
 		}
 	}
-
-	m.Params = make(map[string]string)
 
 	// Let hostname win, but if it's not present, then we'll try to pull it from an interface that matchces the MAC passed. in.
 	if hostname == "" && macaddress != "" {
@@ -143,9 +149,41 @@ func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (
 		hostname = macResults.Results[0].ParentDevice.Name
 	}
 
+	/*
+		Try to grab the host and pull its config_context so that we can stuff it into a params value for people
+		to use later with the from_yaml filter if they want.
+		We need to do it this way because nested json data will blow up JSON marshalling in API responses.
+	*/
+	deviceResults := &netboxDeviceResults{}
+
+	response, err := p.queryNetbox(p.settings.Source + "/dcim/devices/?device=" + hostname)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err = yaml.Unmarshal(response, &deviceResults); err != nil {
+		return nil, err
+		p.Log(fmt.Sprintf("ignoring config_context beacause unmarshal of content is somehow bad for '%s'", hostname), config.LogLevelError)
+	} else {
+
+		if len(deviceResults.Results) == 0 {
+			p.Log(fmt.Sprintf("no matching device results for netbox query with '%s'", hostname), config.LogLevelInfo)
+			return nil, nil
+		}
+
+		cc, err := yaml.Marshal(deviceResults.Results[0].ConfigContext)
+
+		if err != nil {
+			p.Log(fmt.Sprintf("ignoring config_context beacause re-marshal of content is somehow bad for '%s'", hostname), config.LogLevelError)
+		} else {
+			m.Params["config_context"] = string(cc)
+		}
+	}
+
 	results := &netboxInterfaceResults{}
 
-	response, err := p.queryNetbox(p.settings.Source + "/dcim/interfaces/?device=" + hostname)
+	response, err = p.queryNetbox(p.settings.Source + "/dcim/interfaces/?device=" + hostname)
 	p.Log(fmt.Sprintf("retrieved interface data from netbox: %v", string(response)), config.LogLevelDebug)
 
 	if err != nil {
