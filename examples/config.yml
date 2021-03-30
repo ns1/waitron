@@ -163,3 +163,14 @@ unknownbuild_commands:
     errors_fatal: true
     timeout_seconds: 10
     should_log: false
+
+# [pxeevent_commands] will be run when a PXE boot request is received for a valid/active job
+# errors_fatal only controls whether or not subsequent commands will run but it will not prevent an
+# install from continuing.
+pxeevent_commands:
+  - command: |
+        {% include "/etc/waitron/templates/messages/pxe-event.j2" %}
+    errors_fatal: false
+    timeout_seconds: 10
+    should_log: false
+
