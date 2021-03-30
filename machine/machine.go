@@ -14,9 +14,9 @@ type Machine struct {
 	Domain    string      `yaml:"domain,omitempty"`
 	Network   []Interface `yaml:"network,omitempty"`
 
-	IpmiAddressRaw string `yaml:"ipmi_address"`
-	IpmiUser       string `yaml:"ipmi_user"`
-	IpmiPassword   string `yaml:"ipmi_password"`
+	IpmiAddressRaw string          `yaml:"ipmi_address"`
+	IpmiUser       string          `yaml:"ipmi_user"`
+	IpmiPassword   config.Password `yaml:"ipmi_password"`
 
 	BuildTypeName string `yaml:"build_type,omitempty"`
 }

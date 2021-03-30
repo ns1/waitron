@@ -58,13 +58,19 @@ type BuildType struct {
 	Description string   `yaml:"description`
 }
 
+type Password string
+
+func (pw *Password) MarshalJSON() ([]byte, error) {
+	return []byte{'"', '*', '*', '*', '"'}, nil
+}
+
 type MachineInventoryPluginSettings struct {
 	Name              string                 `yaml:"name"`
 	Type              string                 `yaml:"type"`
 	Source            string                 `yaml:"source"`
 	AuthUser          string                 `yaml:"auth_user"`
-	AuthPassword      string                 `yaml:"auth_password"`
-	AuthToken         string                 `yaml:"auth_token"`
+	AuthPassword      Password               `yaml:"auth_password"`
+	AuthToken         Password               `yaml:"auth_token"`
 	AdditionalOptions map[string]interface{} `yaml:"additional_options"`
 	Weight            int                    `yaml:"weight"`
 	WriteEnabled      bool                   `yaml:"writable"`

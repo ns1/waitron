@@ -26,12 +26,10 @@ import (
 
 /*
 	TODO:
-		At least improve how the pre/post/cancel/stale build commands work.
-
 		Figure out logging.
 
 		Take a look at what actually needs to be exported here.  Seems like not much, so either
-		move some of the Job* stuff to a separate package and make the rest fields public, or stop exporting the struct and also just make the properties private.
+		move some of the Job* stuff to a separate package and make the rest of the fields public, or stop exporting the struct and also just make the properties private.
 */
 
 // PixieConfig boot configuration
@@ -167,7 +165,7 @@ func (w *Waitron) GetLogger() WaitronLogger {
 	Create an array of plugin instances.  Only enabled/active plugins will be loaded.
 */
 func (w *Waitron) initPlugins() error {
-	for idx := 0; idx < len(w.config.MachineInventoryPlugins); idx++ {
+	for idx := 0; idx < len(w.config.MachineInventoryPlugins); idx++ { // for-range and pointers don't mix.
 
 		cp := &(w.config.MachineInventoryPlugins[idx])
 
@@ -383,13 +381,16 @@ func (w *Waitron) runBuildCommands(j *Job, b []config.BuildCommand) error {
 func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 	/*
 		Since the details of a BuildType can also exist directly in the root config,
-		An empty buildtype can be assumed to mean we'll use that.
+		an empty buildtype can be assumed to mean we'll use that.
+
 		But, it's important to remember that things will be merged, and using the root config as a "default"
-		Might give you more items in pre/post/stale/cancel command lists than expected.
-		Build type will be passed in
+		might give you more items in pre/post/stale/cancel command lists than expected.
+
 		Build type is how we will know what specific pre-build commands exist
-		Groups and Machines can also have specific pre-build commands, but this should all be handled by how we merge in the configs starting at config->group->machine
+		Machines can also have specific pre-build commands, but this should all be handled by how we merge in the configs starting at config->build-type->machine.
+
 		We can also allow build-type to come from the config of the machine itself.
+
 		If present, we should be merging on top of that build type and not the one passed in herethen have to "rebase" the machine onto the build type it's requesting.
 		If not present, then it will be set from buildType - This must happen so that when the macaddress comes in for the pxe config, we will know what to serve.
 	*/
