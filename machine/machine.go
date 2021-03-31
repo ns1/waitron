@@ -35,8 +35,8 @@ type Interface struct {
 	Addresses4           []IPConfig `yaml:"addresses4"`
 	Addresses6           []IPConfig `yaml:"addresses6"`
 	MacAddress           string     `yaml:"macaddress"`
-	VlanID               int        `yaml"vlan_id"`
-	VlanName             string     `yaml"vlan_name"`
+	VlanID               int        `yaml:"vlan_id"`
+	VlanName             string     `yaml:"vlan_name"`
 	Gateway4             string     `yaml:"gateway4"`
 	Gateway6             string     `yaml:"gateway6"`
 	ZSideDevice          string     `yaml:"zside_device"`
