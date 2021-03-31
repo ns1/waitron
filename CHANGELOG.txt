@@ -1,0 +1,39 @@
+Current
+-------
+* Near complete rewrite of codebase.
+* Reorganized packages/directories.
+* Added more fields to machine and interface structs. (Tags, description, vlan info, z-side endpoint details)
+* Added simple inventory plug-in framework with weighting.
+* Added netbox inventory plug-in.
+* Moved group yml and file yml inventory handling to separate inventory plug-ins.
+* Added build types and removed rescue mode since this can just be a build type now.
+* Added regex_replace tag and from_yaml filter to pongo2.
+* Moved build commands to use temp files.
+* Added build commands config option for PXE requests.
+* Added build commands config option for requests from unknown MACs.
+* Added caching job history.
+* Added endpoints for retrieving and cleaning job history.
+* Added better status tracking.
+* Added ability to handle unknown MACs via.
+* Normalizing MACs.
+* Now associating all MACs of a machine with a job.
+* Separated endpoints for job details and machine details.
+* Added super simple leveled, buffered logging until a logger is chosen.
+* Updated responses from some of the API endpoints.
+* Updated docker-compose.yml and Dockerfile
+* Updated README and examples.
+
+
+v2.0.0
+-------
+* Added in build commands.
+* Removed the ability to name a machine within its config. The config file name now must match the device.
+* Added cancel endpoint.
+* Added config merging: machines now inherit things from the main config.yml as defaults.
+* Created groups as a place to store config between main config and machine config.
+* Added rescue build mode.
+
+v1.0.0
+-------
+
+* Just a branch to store the original Waitron.
