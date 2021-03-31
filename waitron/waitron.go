@@ -365,7 +365,7 @@ func (w *Waitron) runBuildCommands(j *Job, b []config.BuildCommand) error {
 func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 	/*
 		Since the details of a BuildType can also exist directly in the root config,
-		an empty buildtype can be assumed to mean we'll use that.
+		an empty build-type can be assumed to mean we'll use that.
 
 		But, it's important to remember that things will be merged, and using the root config as a "default"
 		might give you more items in pre/post/stale/cancel command lists than expected.
@@ -375,7 +375,7 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 
 		We can also allow build-type to come from the config of the machine itself.
 
-		If present, we should be merging on top of that build type and not the one passed in herethen have to "rebase" the machine onto the build type it's requesting.
+		If present, we should be merging on top of that build type and not the one passed in here, then we have to "rebase" the machine onto the build type it's requesting.
 		If not present, then it will be set from buildType - This must happen so that when the macaddress comes in for the pxe config, we will know what to serve.
 	*/
 

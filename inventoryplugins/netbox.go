@@ -172,6 +172,11 @@ func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (
 			return nil, nil
 		}
 
+		if len(deviceResults.Results) > 1 {
+			p.Log(fmt.Sprintf("more than one device named '%s' found, so using the first one", hostname), config.LogLevelWarning)
+		}
+
+		// There should be only one.
 		cc, err := yaml.Marshal(deviceResults.Results[0].ConfigContext)
 
 		if err != nil {

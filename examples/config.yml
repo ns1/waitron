@@ -53,7 +53,7 @@ inventory_plugins:
       # to populate the machine.IpmiAddressRaw value for use in templates
       # The plugin will also attach any IP and interface tags to the Tags value of that object in Waitron for use in templates. Example: {% if "fallback_interface" in machine.Network[0].Tags %}
       # The plugin will also store the netbox "rendered config context" of the machine in machine.Params.config_context
-      # which can then be converted to a template object with Waitron's custom to_yaml filter.
+      # which can then be converted to a template object with Waitron's custom from_yaml filter.
       # {% with configcontext = machine.Params.config_context|from_yaml %} {{ configcontext.some_netbox_context_value }} {% endwith %}
     - name: netbox
       disabled: True
