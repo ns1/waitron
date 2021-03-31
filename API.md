@@ -67,7 +67,8 @@ Return the waitron configuration details for a machine
 | Code | Status | Description | Has headers | Schema |
 |------|--------|-------------|:-----------:|--------|
 | [200](#get-definition-hostname-type-200) | OK | Machine config in JSON format. |  | [schema](#get-definition-hostname-type-200-schema) |
-| [404](#get-definition-hostname-type-404) | Not Found | Machine not found |  | [schema](#get-definition-hostname-type-404-schema) |
+| [404](#get-definition-hostname-type-404) | Not Found | Unable to find host definition for '<hostname>' '<build_type>' '<error>' |  | [schema](#get-definition-hostname-type-404-schema) |
+| [500](#get-definition-hostname-type-500) | Internal Server Error | Bad machine data for '<hostname>' '<build_type>' '<error>' |  | [schema](#get-definition-hostname-type-500-schema) |
 
 #### Responses
 
@@ -81,10 +82,19 @@ Status: OK
 
 
 
-##### <span id="get-definition-hostname-type-404"></span> 404 - Machine not found
+##### <span id="get-definition-hostname-type-404"></span> 404 - Unable to find host definition for '<hostname>' '<build_type>' '<error>'
 Status: Not Found
 
 ###### <span id="get-definition-hostname-type-404-schema"></span> Schema
+   
+  
+
+
+
+##### <span id="get-definition-hostname-type-500"></span> 500 - Bad machine data for '<hostname>' '<build_type>' '<error>'
+Status: Internal Server Error
+
+###### <span id="get-definition-hostname-type-500-schema"></span> Schema
    
   
 
@@ -335,7 +345,7 @@ Dictionary with kernel, intrd(s) and commandline for pixiecore
 | Code | Status | Description | Has headers | Schema |
 |------|--------|-------------|:-----------:|--------|
 | [200](#get-v1-boot-macaddr-200) | OK | Dictionary with kernel, intrd(s) and commandline for pixiecore |  | [schema](#get-v1-boot-macaddr-200-schema) |
-| [500](#get-v1-boot-macaddr-500) | Internal Server Error | failed to get pxe config |  | [schema](#get-v1-boot-macaddr-500-schema) |
+| [500](#get-v1-boot-macaddr-500) | Internal Server Error | failed to get pxe config: <error> |  | [schema](#get-v1-boot-macaddr-500-schema) |
 
 #### Responses
 
@@ -349,7 +359,7 @@ Status: OK
 
 
 
-##### <span id="get-v1-boot-macaddr-500"></span> 500 - failed to get pxe config
+##### <span id="get-v1-boot-macaddr-500"></span> 500 - failed to get pxe config: <error>
 Status: Internal Server Error
 
 ###### <span id="get-v1-boot-macaddr-500-schema"></span> Schema

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -25,8 +26,10 @@ import (
 
 /*
 	TODO:
-		At least improve how the pre/post/cancel/stale build commands work
-		Figure out logging
+		Figure out logging.
+
+		Take a look at what actually needs to be exported here.  Seems like not much, so either
+		move some of the Job* stuff to a separate package and make the rest of the fields public, or stop exporting the struct and also just make the properties private.
 */
 
 // PixieConfig boot configuration
@@ -56,9 +59,16 @@ type Job struct {
 	Status       string
 	StatusReason string
 
-	BuildTypeName string
-	Machine       *machine.Machine
-	Token         string
+	BuildTypeName        string
+	Machine              *machine.Machine
+	TriggerMacRaw        string // The MAC that actually came in looking for a PXE boot.
+	TriggerMacNormalized string
+	Token                string
+}
+
+type activePlugin struct {
+	plugin   inventoryplugins.MachineInventoryPlugin
+	settings *config.MachineInventoryPluginSettings
 }
 
 type Waitron struct {
@@ -72,25 +82,9 @@ type Waitron struct {
 	done chan struct{}
 	wg   sync.WaitGroup
 
-	activePlugins []inventoryplugins.MachineInventoryPlugin
+	activePlugins []activePlugin
 
 	logs chan string
-}
-
-func FilterGetValueByKey(in *pongo2.Value, param *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
-
-	m := in.Interface().(map[string]string)
-
-	if val, ok := m[param.String()]; ok {
-		return pongo2.AsValue(val), nil
-	} else {
-		return pongo2.AsValue(""), nil
-	}
-}
-
-func init() {
-
-	pongo2.RegisterFilter("key", FilterGetValueByKey)
 }
 
 func New(c *config.Config) *Waitron {
@@ -101,7 +95,7 @@ func New(c *config.Config) *Waitron {
 		historyBlobLastCached: time.Time{},
 		done:                  make(chan struct{}, 1),
 		wg:                    sync.WaitGroup{},
-		activePlugins:         make([]inventoryplugins.MachineInventoryPlugin, 0, 1),
+		activePlugins:         make([]activePlugin, 0, 1),
 		logs:                  make(chan string, 1000),
 	}
 
@@ -155,10 +149,13 @@ func (w *Waitron) GetLogger() WaitronLogger {
 	Create an array of plugin instances.  Only enabled/active plugins will be loaded.
 */
 func (w *Waitron) initPlugins() error {
-	for _, cp := range w.config.MachineInventoryPlugins {
+	for idx := 0; idx < len(w.config.MachineInventoryPlugins); idx++ { // for-range and pointers don't mix.
+
+		cp := &(w.config.MachineInventoryPlugins[idx])
+
 		if !cp.Disabled {
 
-			p, err := inventoryplugins.GetPlugin(cp.Name, &cp, w.config, w.addLog)
+			p, err := inventoryplugins.GetPlugin(cp.Name, cp, w.config, w.addLog)
 
 			if err != nil {
 				return err
@@ -168,7 +165,7 @@ func (w *Waitron) initPlugins() error {
 				return err
 			}
 
-			w.activePlugins = append(w.activePlugins, p)
+			w.activePlugins = append(w.activePlugins, activePlugin{plugin: p, settings: cp})
 		}
 	}
 	return nil
@@ -267,7 +264,29 @@ func (w *Waitron) checkForStaleJobs() {
 	This should ensure that even commands that spawn child processes are cleaned up correctly, along with their children.
 */
 func (w *Waitron) timedCommandOutput(timeout time.Duration, command string) ([]byte, error) {
-	cmd := exec.Command("bash", "-c", command)
+
+	tmpfile, err := ioutil.TempFile(w.config.TempPath, "waitron.timedCommandOutput")
+	if err != nil {
+		return []byte{}, err
+	}
+
+	defer os.Remove(tmpfile.Name())
+
+	if _, err = tmpfile.Write([]byte(command)); err != nil {
+		return []byte{}, err
+	}
+
+	if err = tmpfile.Close(); err != nil {
+		return []byte{}, err
+	}
+
+	if err = os.Chmod(tmpfile.Name(), 0700); err != nil {
+		return []byte{}, err
+	}
+
+	// Fair credit: Decided to migrate to a compact version of github user abh's idea for a temp file vs straight to bash -c.
+	// 				Not as nice for simple commands but more pleasant for large scripts.
+	cmd := exec.Command(tmpfile.Name())
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	outP, err := cmd.StdoutPipe() // Set up the stdout pipe
@@ -321,12 +340,12 @@ func (w *Waitron) runBuildCommands(j *Job, b []config.BuildCommand) error {
 		cmdline, err := tpl.Execute(pongo2.Context{"job": j, "machine": j.Machine, "token": j.Token})
 		j.RUnlock()
 
-		if buildCommand.ShouldLog {
-			w.addLog(cmdline, config.LogLevelInfo)
-		}
-
 		if err != nil {
 			return err
+		}
+
+		if buildCommand.ShouldLog {
+			w.addLog(cmdline, config.LogLevelInfo)
 		}
 
 		// Now actually execute the command and return err if ErrorsFatal
@@ -346,14 +365,17 @@ func (w *Waitron) runBuildCommands(j *Job, b []config.BuildCommand) error {
 func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 	/*
 		Since the details of a BuildType can also exist directly in the root config,
-		An empty buildtype can be assumed to mean we'll use that.
+		an empty build-type can be assumed to mean we'll use that.
+
 		But, it's important to remember that things will be merged, and using the root config as a "default"
-		Might give you more items in pre/post/stale/cancel command lists than expected.
-		Build type will be passed in
+		might give you more items in pre/post/stale/cancel command lists than expected.
+
 		Build type is how we will know what specific pre-build commands exist
-		Groups and Machines can also have specific pre-build commands, but this should all be handled by how we merge in the configs starting at config->group->machine
+		Machines can also have specific pre-build commands, but this should all be handled by how we merge in the configs starting at config->build-type->machine.
+
 		We can also allow build-type to come from the config of the machine itself.
-		If present, we should be merging on top of that build type and not the one passed in herethen have to "rebase" the machine onto the build type it's requesting.
+
+		If present, we should be merging on top of that build type and not the one passed in here, then we have to "rebase" the machine onto the build type it's requesting.
 		If not present, then it will be set from buildType - This must happen so that when the macaddress comes in for the pxe config, we will know what to serve.
 	*/
 
@@ -406,8 +428,10 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 	r := strings.NewReplacer(":", "", "-", "", ".", "")
 
 	for i := 0; i < len(j.Machine.Network); i++ {
-		j.Machine.Network[i].MacAddress = strings.ToLower(r.Replace(j.Machine.Network[i].MacAddress))
-		macs = append(macs, j.Machine.Network[i].MacAddress)
+		if j.Machine.Network[i].MacAddress != "" {
+			j.Machine.Network[i].MacAddress = strings.ToLower(r.Replace(j.Machine.Network[i].MacAddress))
+			macs = append(macs, j.Machine.Network[i].MacAddress)
+		}
 	}
 
 	w.addLog(fmt.Sprintf("adding job %s", token), config.LogLevelDebug)
@@ -437,8 +461,18 @@ func (w *Waitron) getMergedInventoryMachine(hostname string, mac string) (*machi
 		Take the hostname and start looping through the inventory plugins
 		Merge details as you get them into a single, compiled Machine object
 	*/
-	for _, p := range w.activePlugins {
-		pm, err := p.GetMachine(hostname, mac)
+	maxWeightSeen := 0
+	for _, ap := range w.activePlugins {
+
+		/*
+			If we've already found details in a higher-precedence plugins, there's no need to even check the current one.
+			This would mean that a plugin of greater weight was executed AND returned data.
+		*/
+		if ap.settings.Weight < maxWeightSeen {
+			continue
+		}
+
+		pm, err := ap.plugin.GetMachine(hostname, mac)
 
 		if err != nil {
 			w.addLog(fmt.Sprintf("failed to get machine from plugin in: %v", err), config.LogLevelInfo)
@@ -448,22 +482,38 @@ func (w *Waitron) getMergedInventoryMachine(hostname string, mac string) (*machi
 		if pm != nil {
 			// Just keep merging in details that we find
 			if b, err := yaml.Marshal(pm); err == nil {
+
+				/*
+					But if we are now working on the response from a plugin with a greater weight than all previous plugins that returned data,
+					then we need to clobber all the previous data and let this current one replace it all.
+				*/
+				if ap.settings.Weight > maxWeightSeen {
+					m = &machine.Machine{}
+					maxWeightSeen = ap.settings.Weight
+				}
+
 				if err = yaml.Unmarshal(b, m); err != nil {
-					// Just log.  Don't let one plugin break everything.
-					w.addLog(fmt.Sprintf("failed to unmarshal plugin data during machine merging: %v", err), config.LogLevelError)
-					continue
+					return nil, err
 				}
 			} else {
+				// Just log.  Don't let one plugin break everything.
 				w.addLog(fmt.Sprintf("failed to marshal plugin data during machine merging: %v", err), config.LogLevelError)
 				continue
 			}
 
-			anyFound = true
+			/*
+				We found details, but we've been told not to treat them as inidicitive of finding a true machine definition.
+				I.e., the user probably wants this treated as supplmental information if a machine is found in some other plugin.
+			*/
+			if !ap.settings.SupplementalOnly {
+				anyFound = true
+			}
 		}
 	}
 
 	// Bail out if we didn't find the machine anywhere.
 	if !anyFound {
+		w.addLog(fmt.Sprintf("machine not found in any non-supplemental plugin"), config.LogLevelDebug)
 		return nil, nil
 	}
 
@@ -661,6 +711,24 @@ func (w *Waitron) getPxeConfigForUnknown(b *config.BuildType, macaddress string)
 		return PixieConfig{}, fmt.Errorf("job not found for  '%s' and _unknown_ builds not requested", macaddress)
 	}
 
+	w.addLog(fmt.Sprintf("running unknown-build commands for job %s", macaddress), config.LogLevelDebug)
+
+	// Perform any desired operations when an unknown MAC is seen.
+	if len(w.config.UnknownBuildCommands) > 0 {
+		/*
+			I don't want runBuildCommands to accept an empty interface.
+			For now, at least, I'd prefer sending in a nearly empty job and repurposing the Token field to send the MAC
+		*/
+		j := &Job{
+			Token: macaddress,
+		}
+
+		if err := w.runBuildCommands(j, w.config.UnknownBuildCommands); err != nil {
+			w.addLog(fmt.Sprintf("unknown-build commands for %s returned errors %v", macaddress, err), config.LogLevelDebug)
+			return PixieConfig{}, err
+		}
+	}
+
 	w.addLog("going to send _unknown_ details to unknown mac", config.LogLevelInfo)
 
 	pixieConfig := PixieConfig{}
@@ -701,24 +769,33 @@ func (w *Waitron) GetPxeConfig(macaddress string) (PixieConfig, error) {
 
 	// Normalize the MAC
 	r := strings.NewReplacer(":", "", "-", "", ".", "")
-	macaddress = strings.ToLower(r.Replace(macaddress))
+	normMacaddress := strings.ToLower(r.Replace(macaddress))
 
 	// Look up the *Job by MAC
 	w.jobs.RLock()
-	j, found := w.jobs.jobByMAC[macaddress]
+	j, found := w.jobs.jobByMAC[normMacaddress]
 	w.jobs.RUnlock()
 
 	if !found {
 		if uBuild, ok := w.config.BuildTypes["_unknown_"]; ok {
-			return w.getPxeConfigForUnknown(&uBuild, macaddress)
+			return w.getPxeConfigForUnknown(&uBuild, normMacaddress)
 		} else {
-			return PixieConfig{}, fmt.Errorf("job not found for  '%s'", macaddress)
+			return PixieConfig{}, fmt.Errorf("job not found for  '%s'", normMacaddress)
 		}
 	}
 
 	// Build the pxe config based on the compiled machine details.
 
 	pixieConfig := PixieConfig{}
+
+	/*
+		It's entirely possible for multiple requests to come in for the same MAC, either from retries or because pixiecore/dhcp
+		has been set up as "cluster" and you have "duplicate" pxe requests, but only one will ultimately be selected.
+		We'll only want to trigger certain things when we're seeing a PXE for a MAC for the first time, such as when a set a network cards attempt PXE in order.
+
+		Unique is a bit of a lie, though, since e.g. a machine looping endlessly through two network cards would keep toggling this var as it rotates through NICs/MACs
+	*/
+	uniquePxeRequest := false
 
 	var cmdline, imageURL, kernel, initrd string
 
@@ -738,22 +815,54 @@ func (w *Waitron) GetPxeConfig(macaddress string) (PixieConfig, error) {
 
 	j.RUnlock()
 	j.Lock()
-	defer j.Unlock()
+	/*
+		The deferred unlock was removed.  Even though the (read-locking) runBuildCommands call near the end
+		is happening in a go-routine, having it happen while this function is holding a write-lock
+		makes me too nervous.  It just feels too dead-lockish.
+	*/
+
+	if j.TriggerMacRaw != macaddress {
+		uniquePxeRequest = true
+		j.TriggerMacRaw = macaddress
+		j.TriggerMacNormalized = normMacaddress
+	}
 
 	if err != nil {
 		j.Status = "failed"
 		j.StatusReason = "pxe config build failed"
+
+		j.Unlock()
+
 		return pixieConfig, err
 	} else {
 		j.Status = "installing"
 		j.StatusReason = "pxe config sent"
 	}
 
+	j.Unlock()
+
 	imageURL = strings.TrimRight(imageURL, "/")
 
 	pixieConfig.Kernel = imageURL + "/" + kernel
 	pixieConfig.Initrd = []string{imageURL + "/" + initrd}
 	pixieConfig.Cmdline = cmdline
+
+	/*
+		It can be pretty valuable to be able to run commands when a PXE is received,
+		but they shouldn't be allowed to block an install at this point.
+
+		This would probably be good spot where go-routines could leak if a user were to create super-long running commands
+		that don't, or practically don't, timeout.
+	*/
+	if uniquePxeRequest {
+		go func() {
+			if err := w.runBuildCommands(j, j.Machine.PxeEventCommands); err != nil {
+				w.addLog(fmt.Sprintf("pxe-event commands for %s returned errors %v", macaddress, err), config.LogLevelError)
+			}
+		}()
+	}
+
+	w.addLog(fmt.Sprintf("PXE config for %s: %v", macaddress, pixieConfig), config.LogLevelDebug)
 
 	return pixieConfig, nil
 }

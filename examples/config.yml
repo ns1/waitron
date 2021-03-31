@@ -1,0 +1,198 @@
+# The URL of your Waitron service
+baseurl: http://waitron.example.com:7078
+
+# A directory that can be used by Waitron and plugins for temporary data/files.
+# Plugins _should_ respect this setting.
+temp_path: /tmp
+
+# During an active build, anything in here can be requested and will be rendered and returned in the API response.
+# preseed/cloud-init, finish, and any other templates used in your build should go here.
+templatepath: /etc/waitron/templates
+
+# Any files that you build depends on, or if you just want to host some of your own images,
+# such as a small rescue kernel+initrd can be stored here and will be accessible at  [baseurl]/files/
+staticspath: /etc/waitron/files
+
+# In order of increasing verbosity: ERROR, WARN, INFO, DEBUG
+log_level: INFO
+
+# For how long do you want the job history json blog to be cached once requested?
+history_cache_seconds: 20
+
+# During builds, inventory plugins will be checked for machine details in the order below.
+# Details found will me merged according to the details for the [weight] option below.
+inventory_plugins:
+    - name: groups
+      type: groups
+      # Only use the details returned from this plugin if the device is found in another plugig.
+      # I.e., if this plugin is the only place we found the machine, treat it as not found.
+      supplemental_only: True
+      # [weight] is used to determine how inventory data should be merged.  The default is 0.
+      # Plugins of the same weight can be merged.
+      # Plugins of greater weight will COMPLETELY overwrite data of plugins with lower weights that had been compiled prior to their execution.
+      #weight: 0
+      additional_options:
+              # [grouppath] is required for this plugin, but the existence of group files within the path is not required.
+              # group data is optional data that can be used to include "group-wide" config details.
+              # For example a host named dns02.example.com.yml would be seen as belonging to the group "example.com"
+              # During builds /etc/waitron/groups/example.com.yml would be searched and have its config details used if found.
+              grouppath: /etc/waitron/groups/ 
+    - name: file
+      type: file
+      additional_options:
+              # [machinepath] is a required path for this plugin.
+              # If a build is requested for hostname "dns02.example.com"
+              # this path would be searched for dns02.example.com.yml.
+              machinepath: /etc/waitron/machines/              
+
+      # type:netbox will let you pull inventory data from a netbox API server.
+      # It's possible to tag things in netbox to have the plugin attempt to fill out fields for you.
+      # The tag waitron_gateway on an IP address will let the plugin attempt to set the Gateway4 and Gateway6 values for the interface in machine.Network[].
+      # For example, you could then access it in a template with {{ machine.Network[0].Gateway6 }}
+      # The tag waitron_ipmi on an interface in netbox will let the plugin pull any attached IP addresses on the interface
+      # to populate the machine.IpmiAddressRaw value for use in templates
+      # The plugin will also attach any IP and interface tags to the Tags value of that object in Waitron for use in templates. Example: {% if "fallback_interface" in machine.Network[0].Tags %}
+      # The plugin will also store the netbox "rendered config context" of the machine in machine.Params.config_context
+      # which can then be converted to a template object with Waitron's custom from_yaml filter.
+      # {% with configcontext = machine.Params.config_context|from_yaml %} {{ configcontext.some_netbox_context_value }} {% endwith %}
+    - name: netbox
+      disabled: True
+      type: netbox
+      source: "https://netbox.example.com/api"
+      auth_token: "some_netbox_api_token"        
+      additional_options:
+        enabled_assets_only: False # Do you want to restrict netbox query results to enabled devices/interfaces/IPs only?
+
+#############################################################################
+# New build types can be specified here.                                    #
+# Any option that exists in the "DEFAULTS" section below can be overridden. #
+#############################################################################
+build_types:
+    rescue:
+        image_url: http://waitron.example.com:7078/files/ # See "staticspath" above for more details about the value used here.
+        kernel: vmlinuz64
+        initrd: corepure64.gz
+        cmdline: " loglevel=3 nameservers=2001:4860:4860::8888 ipv6_address={{machine.Params.provisioning_address}} ipv6_gateway={{machine.Params.provisioning_gateway}} ipv6_cidr={{machine.Params.provisioning_cidr}} "
+        stale_build_threshold_secs: 9000
+        params:
+            nameservers: "8.8.8.8"    
+            os_version_name: "rescue-image"
+    # For "power users," _unknown_ is a special, optional build type that will be invoked when Waitron receives a MAC that it doesn't know about.
+    # After checking all inventory plugins using the incoming MAC, if no matching device is found, it will use the _unknown_ build type.
+    # There is a corresponding [unknownbuild_commands] option below that can be used to run any desired commands when an unknown MAC is seen.
+    # Note that any templating in cmdline or in any build commands will have limited information and should only expect to have "{{ Token }}" available,
+    # which will hold the MAC of the unknown device.
+    # Also, this WILL NOT work well with the file plugin because the file plugin cannot currently search by MAC and will trigger
+    # an _unknown_ for any machine not in build mode if it is the only plugin in use.
+    _unknown_:
+        image_url: http://waitron.example.com:7078/files/
+        kernel: vmlinuz64
+        initrd: corepure64.gz
+        cmdline: " loglevel=3 "
+        stale_build_threshold_secs: 9000
+        params:
+            nameservers: "8.8.8.8"    
+            os_version_name: "discovery-image"
+            
+
+######################################## HOW DETAILS ARE MERGED ###############################################
+# During builds, the order of merging looks like this [base config (config.yml)] -> [build type] -> [machine] #
+# Details specified in machine details have the highest precedence.                                           #
+# Array/lists are merged as details are merged.                                                               #
+# Dictionaries are merged but existing simple values are replaced.                                            #
+# Simple values get replaced.                                                                                 #
+###############################################################################################################
+
+################################# DEFAULTS ############################################
+# Everything below will function as "default" build options.                          #
+# If no build type is specified during the build request, these options will be used. #
+# The can be overridden in whole or in part in a build-type specification             #
+#######################################################################################
+# NOTE: It's possible to use iPXE variables such as ${netX/mac} in the cmdline.
+#       For example, rather than use interface and ksdevice values below, some users may be able
+#       to simply use netcfg/choose_interface=${netX/mac} to let the netboot process
+#       automatically select the interface that triggered the PXE process.
+cmdline: "netcfg/get_nameservers=8.8.4.4 netcfg/disable_dhcp=true interface={{ machine.Network.0.Name }} ksdevice={{ machine.Network.0.Name }} netcfg/get_ipaddress={{ machine.Network.0.Addresses4.0.IPAddress }} netcfg/get_gateway={{ machine.Network.0.Gateway4 }} netcfg/get_netmask={{ machine.Network.0.Addresses4.0.Netmask }} url={{ BaseURL }}/template/preseed/{{ Hostname }}/{{ Token }} ramdisk_size=10800 root=/dev/rd/0 rw auto hostname={{ Hostname }} console-setup/ask_detect=false console-setup/layout=USA console-setup/variant=USA keyboard-configuration/layoutcode=us localechooser/translation/warn-light=true localechooser/translation/warn-severe=true locale=en_US"
+operatingsystem: "18.04"
+kernel: linux
+image_url: http://archive.ubuntu.com/ubuntu/dists/bionic-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64/
+initrd: initrd.gz
+preseed: preseed.j2
+finish: finish.j2
+
+stale_build_threshold_secs: 900
+stale_build_check_frequency_secs: 300
+
+# These are example params and could be any extra details that you want to access in your templates.
+# For eaxmple,  {{ machine.Params.apt_hostname }}
+params:
+    apt_hostname: "archive.ubuntu.com"
+    apt_path: "/ubuntu/"
+    nameservers: "8.8.8.8"    
+    ntp_server: "pool.ntp.org"
+    include_packages: "python2.7 ipmitool lsb-release openssh-server vim ifenslave vlan lldpd secure-delete curl wget strace"
+    os_version_name: "bionic"
+
+# All "command" content in the build commands below have access to the following additional filters/tags:
+# from_yaml:
+#    Accepts: A single string containing valid YAML
+#    Returns: A template object according to the YAML passed in
+#    Example: {% with configcontext = machine.Params.config_context|from_yaml %} {{ configcontext.some_netbox_context_value }} {% endwith %}
+# regex_replace:
+#    Accepts: 3 arguments: <input string>, <regular expression string>, and <replacement string>
+#    Returns: The original string with all instances of <regular expression string> in <input string> with <replacement string>
+#             To use escape characters, you'll need to escape them.  See example below.       
+#    Example: {% regex_replace interface.Description "\\d+" "" %}
+
+# Any of the commands below can be written inline directly in the config file or can be include from additional templates.
+# [stalebuild_commands] will be run when the build has taken longer than [stale_build_threshold_secs]
+stalebuild_commands:
+  - command: |
+        {% include "/etc/waitron/templates/messages/stale.j2" %}
+    errors_fatal: true  # Should errors be returned and cause any further commands to be skipped?
+    timeout_seconds: 10 # How long should the command be allowed to run?
+    should_log: true    # Should the command be logged?
+
+# [prebuild_commands] will be run when the machine is requested but before the machine is put into build mode.
+prebuild_commands:
+  - command: |
+        {% include "/etc/waitron/templates/messages/build.j2" %}
+    errors_fatal: true
+    timeout_seconds: 10
+    should_log: false
+
+# [postbuild_commands] will be run once the "done" api endpoint has been hit but before the job is cleaned up and marked as "completed"
+postbuild_commands:
+  - command: |
+        {% include "/etc/waitron/templates/messages/done.j2" %}
+    errors_fatal: true
+    timeout_seconds: 10
+    should_log: false
+
+# [cancelbuild_commands] will be run once the "cancel" api endpoint has been hit but before the job is cleaned up and marked as "terminated"
+cancelbuild_commands:
+  - command: |
+        {% include "/etc/waitron/templates/messages/cancel.j2" %}
+    errors_fatal: true
+    timeout_seconds: 10
+    should_log: false
+
+# [unknownbuild_commands] will be run when only when Waitron receives a pxe request for a MAC it cannot find in any inventory plugin.
+# These will only be run if the "_unknown_" build type has been added to the "build_types" section of the config.
+unknownbuild_commands:
+  - command: |
+        {% include "/etc/waitron/templates/messages/unknown.j2" %}
+    errors_fatal: true
+    timeout_seconds: 10
+    should_log: false
+
+# [pxeevent_commands] will be run when a PXE boot request is received for a valid/active job
+# errors_fatal only controls whether or not subsequent commands will run but it will not prevent an
+# install from continuing.
+pxeevent_commands:
+  - command: |
+        {% include "/etc/waitron/templates/messages/pxe-event.j2" %}
+    errors_fatal: false
+    timeout_seconds: 10
+    should_log: false
+

@@ -59,39 +59,11 @@ func (p *FileInventoryPlugin) PutMachine(m *machine.Machine) error {
 
 func (p *FileInventoryPlugin) GetMachine(hostname string, macaddress string) (*machine.Machine, error) {
 	hostname = strings.ToLower(hostname)
-	hostSlice := strings.Split(hostname, ".")
 
-	m := &machine.Machine{
-		Hostname:  hostname,
-		ShortName: hostSlice[0],
-		Domain:    strings.Join(hostSlice[1:], "."),
-	}
+	m, err := machine.New(hostname)
 
-	groupPath, ok := p.settings.AdditionalOptions["grouppath"].(string)
-
-	p.Log(fmt.Sprintf("looking for %s.[yml|yaml] in %s", m.Domain, groupPath), config.LogLevelDebug)
-
-	// Move the path settings and checks to Init so we can blow up early.
-	if ok {
-		groupPath = strings.TrimRight(groupPath, "/") + "/"
-		// Then, load the domain definition.
-		data, err := ioutil.ReadFile(path.Join(groupPath, m.Domain+".yaml")) // apc03.prod.yaml
-
-		if os.IsNotExist(err) {
-			data, err = ioutil.ReadFile(path.Join(groupPath, m.Domain+".yml")) // Try .yml
-			if err != nil && !os.IsNotExist(err) {                             // We should expect the file to not exist, but if it did exist, err happened for a different reason, then it should be reported.
-				return nil, err // Some error beyond just "not found"
-			}
-		} else {
-			return nil, err // Some error beyond just "not found"
-		}
-
-		if len(data) > 0 { // Group Files are optional.  So we shouldn't be failing unless they were requested and found.
-			if err = yaml.Unmarshal(data, m); err != nil {
-				return nil, err
-			}
-		}
-
+	if err != nil {
+		return nil, err
 	}
 
 	p.Log(fmt.Sprintf("looking for %s.[yml|yaml] in %s", hostname, p.machinePath), config.LogLevelDebug)
@@ -127,9 +99,13 @@ func (p *FileInventoryPlugin) GetMachine(hostname string, macaddress string) (*m
 	err = yaml.Unmarshal(data, m)
 	if err != nil {
 		// Don't blow everything up on bad data.  Only truly critical errors should be passed back.
+		// Log and return "nothing" so that the next inventory plugin can do stuff.
+		// If this was the only inventory plugin used, then the build request will fail, anyway.
 		p.Log(fmt.Sprintf("unable to unmarshal %s.[yml|yaml]: %v", hostname, err), config.LogLevelError)
 		return nil, nil
 	}
+
+	p.Log(fmt.Sprintf("got machine from plugin in: %v", m), config.LogLevelDebug)
 
 	return m, nil
 }

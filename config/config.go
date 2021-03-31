@@ -40,17 +40,33 @@ type BuildType struct {
 	Initrd   string `yaml:"initrd,omitempty"`
 	ImageURL string `yaml:"image_url,omitempty"`
 
-	OperatingSystem string `yaml:"operatingsystem,omitempty"`
-	Finish          string `yaml:"finish,omitempty"`
-	Preseed         string `yaml:"preseed,omitempty"`
-	Params          map[string]string
+	OperatingSystem string            `yaml:"operatingsystem,omitempty"`
+	Finish          string            `yaml:"finish,omitempty"`
+	Preseed         string            `yaml:"preseed,omitempty"`
+	Params          map[string]string `yaml:"params,omitempty"`
 
 	StaleBuildThresholdSeconds int `yaml:"stale_build_threshold_secs,omitempty"`
 
-	StaleBuildCommands  []BuildCommand `yaml:"stalebuild_commands,omitempty"`
-	PreBuildCommands    []BuildCommand `yaml:"prebuild_commands,omitempty"`
-	PostBuildCommands   []BuildCommand `yaml:"postbuild_commands,omitempty"`
-	CancelBuildCommands []BuildCommand `yaml:"cancelbuild_commands,omitempty"`
+	StaleBuildCommands   []BuildCommand `yaml:"stalebuild_commands,omitempty"`
+	PreBuildCommands     []BuildCommand `yaml:"prebuild_commands,omitempty"`
+	PostBuildCommands    []BuildCommand `yaml:"postbuild_commands,omitempty"`
+	CancelBuildCommands  []BuildCommand `yaml:"cancelbuild_commands,omitempty"`
+	UnknownBuildCommands []BuildCommand `yaml:"unknownbuild_commands,omitempty"`
+	PxeEventCommands     []BuildCommand `yaml:"pxeevent_commands,omitempty"`
+
+	Tags        []string `yaml:"tags`
+	Description string   `yaml:"description`
+}
+
+/*
+	All the wacky marshal/unmarshal stuff being done internall uses the yaml lib,
+	and we only start doing JSON when we want to respond to API calls.
+	That means, for now, we can easily hide password values with a custom MarshalJSON.
+*/
+type Password string
+
+func (pw *Password) MarshalJSON() ([]byte, error) {
+	return []byte{'"', '*', '*', '*', '"'}, nil
 }
 
 type MachineInventoryPluginSettings struct {
@@ -58,15 +74,18 @@ type MachineInventoryPluginSettings struct {
 	Type              string                 `yaml:"type"`
 	Source            string                 `yaml:"source"`
 	AuthUser          string                 `yaml:"auth_user"`
-	AuthPassword      string                 `yaml:"auth_password"`
-	AuthToken         string                 `yaml:"auth_token"`
+	AuthPassword      Password               `yaml:"auth_password"`
+	AuthToken         Password               `yaml:"auth_token"`
 	AdditionalOptions map[string]interface{} `yaml:"additional_options"`
+	Weight            int                    `yaml:"weight"`
 	WriteEnabled      bool                   `yaml:"writable"`
 	Disabled          bool                   `yaml:"disabled"`
+	SupplementalOnly  bool                   `yaml:"supplemental_only"`
 }
 
 // Config is our global configuration file
 type Config struct {
+	TempPath        string `yaml:"temp_path"`
 	TemplatePath    string `yaml:"templatepath,omitempty"`
 	GroupPath       string `yaml:"grouppath,omitempty"`
 	StaticFilesPath string `yaml:"staticspath,omitempty"`
