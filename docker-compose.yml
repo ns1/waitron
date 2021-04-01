@@ -1,7 +1,7 @@
 waitron:
     #cap_add:
     #- NET_ADMIN # Uncomment if you expect to have waitron manipulate local iptables configs with build commands.
-    command: ' --port 7078 '
+    command: ' --port 80 '
     image: waitron:latest
     log_driver: syslog
     log_opt:

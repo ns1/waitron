@@ -84,10 +84,14 @@ type MachineInventoryPluginSettings struct {
 }
 
 // Config is our global configuration file
+/*
+	The omitempty's need to be cleaned up.  They're mostly there to let someone see the state of things when they requested a build.
+	If they try to override some of the values in a machine definition from an inventory plugin, it'll show in the JSON
+	response that the API endpoints provide, but it'll be a lie because they won't have actually changed the config.
+*/
 type Config struct {
-	TempPath        string `yaml:"temp_path"`
+	TempPath        string `yaml:"temp_path,omitempty"`
 	TemplatePath    string `yaml:"templatepath,omitempty"`
-	GroupPath       string `yaml:"grouppath,omitempty"`
 	StaticFilesPath string `yaml:"staticspath,omitempty"`
 	BaseURL         string `yaml:"baseurl,omitempty"`
 
