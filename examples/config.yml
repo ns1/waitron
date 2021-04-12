@@ -9,8 +9,8 @@ temp_path: /tmp
 # preseed/cloud-init, finish, and any other templates used in your build should go here.
 templatepath: /etc/waitron/templates
 
-# Any files that you build depends on, or if you just want to host some of your own images,
-# such as a small rescue kernel+initrd can be stored here and will be accessible at  [baseurl]/files/
+# Any files that your build depends on, or if you just want to host some of your own images,
+# such as a small rescue kernel+initrd, can be stored here and will be accessible at  [baseurl]/files/
 staticspath: /etc/waitron/files
 
 # In order of increasing verbosity: ERROR, WARN, INFO, DEBUG
@@ -34,23 +34,23 @@ inventory_plugins:
       additional_options:
               # [grouppath] is required for this plugin, but the existence of group files within the path is not required.
               # group data is optional data that can be used to include "group-wide" config details.
-              # For example a host named dns02.example.com.yml would be seen as belonging to the group "example.com"
-              # During builds /etc/waitron/groups/example.com.yml would be searched and have its config details used if found.
+              # For example, a host named dns02.example.com.yml would be seen as belonging to the group "example.com"
+              # During builds, /etc/waitron/groups/example.com.yml would be searched and have its config details used if found.
               grouppath: /etc/waitron/groups/ 
     - name: file
       type: file
       additional_options:
               # [machinepath] is a required path for this plugin.
-              # If a build is requested for hostname "dns02.example.com"
+              # If a build is requested for hostname "dns02.example.com",
               # this path would be searched for dns02.example.com.yml.
               machinepath: /etc/waitron/machines/              
 
       # type:netbox will let you pull inventory data from a netbox API server.
-      # It's possible to tag things in netbox to have the plugin attempt to fill out fields for you.
+      # It's possible to tag things in netbox in order to have the plugin attempt to fill out fields for you.
       # The tag waitron_gateway on an IP address will let the plugin attempt to set the Gateway4 and Gateway6 values for the interface in machine.Network[].
       # For example, you could then access it in a template with {{ machine.Network[0].Gateway6 }}
       # The tag waitron_ipmi on an interface in netbox will let the plugin pull any attached IP addresses on the interface
-      # to populate the machine.IpmiAddressRaw value for use in templates
+      # to populate the machine.IpmiAddressRaw value for use in templates.
       # The plugin will also attach any IP and interface tags to the Tags value of that object in Waitron for use in templates. Example: {% if "fallback_interface" in machine.Network[0].Tags %}
       # The plugin will also store the netbox "rendered config context" of the machine in machine.Params.config_context
       # which can then be converted to a template object with Waitron's custom from_yaml filter.
@@ -124,7 +124,7 @@ stale_build_threshold_secs: 900
 stale_build_check_frequency_secs: 300
 
 # These are example params and could be any extra details that you want to access in your templates.
-# For eaxmple,  {{ machine.Params.apt_hostname }}
+# For eaxmple, {{ machine.Params.apt_hostname }}
 params:
     apt_hostname: "archive.ubuntu.com"
     apt_path: "/ubuntu/"
@@ -140,11 +140,11 @@ params:
 #    Example: {% with configcontext = machine.Params.config_context|from_yaml %} {{ configcontext.some_netbox_context_value }} {% endwith %}
 # regex_replace:
 #    Accepts: 3 arguments: <input string>, <regular expression string>, and <replacement string>
-#    Returns: The original string with all instances of <regular expression string> in <input string> with <replacement string>
+#    Returns: The original string with all instances of <regular expression string> in <input string> replaced with <replacement string>
 #             To use escape characters, you'll need to escape them.  See example below.       
 #    Example: {% regex_replace interface.Description "\\d+" "" %}
 
-# Any of the commands below can be written inline directly in the config file or can be include from additional templates.
+# Any of the commands below can be written inline directly in the config file or can be included from additional templates.
 # [stalebuild_commands] will be run when the build has taken longer than [stale_build_threshold_secs]
 stalebuild_commands:
   - command: |
