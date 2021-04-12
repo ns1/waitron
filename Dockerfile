@@ -14,3 +14,5 @@ RUN apt-get -y update && apt-get -y install wget curl ipmitool strace openssh-cl
 COPY --from=builder /usr/local/bin/waitron /usr/local/bin/waitron
 
 ENTRYPOINT [ "waitron", "--config", "/etc/waitron/config.yml"]
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s CMD curl -X GET http://localhost/health
