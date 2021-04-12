@@ -156,7 +156,7 @@ func (p *NetboxInventoryPlugin) GetMachine(hostname string, macaddress string) (
 	*/
 	deviceResults := &netboxDeviceResults{}
 
-	response, err := p.queryNetbox(p.settings.Source + "/dcim/devices/?device=" + hostname)
+	response, err := p.queryNetbox(p.settings.Source + "/dcim/devices/?name=" + hostname)
 
 	if err != nil {
 		return nil, err
