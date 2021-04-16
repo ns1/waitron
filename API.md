@@ -388,7 +388,7 @@ Put the server in build mode
 |------|--------|------|---------|-----------| :------: |---------|-------------|
 | hostname | `path` | string | `string` |  | ✓ |  | Hostname |
 | type | `path` | string | `string` |  | ✓ |  | Build Type |
-| machine | `body` | string | `string` | | ✓ | | Machine definition if desired.  Can be used to override nearly all properties of a compiled machine.  See examples directory for machine definition. |
+| {object} | `body` | string | `string` | | ✓ | | Machine definition if desired.  Can be used to override nearly all properties of a compiled machine.  See examples directory for machine definition. |
 
 #### All responses
 | Code | Status | Description | Has headers | Schema |

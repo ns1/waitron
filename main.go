@@ -106,7 +106,7 @@ func templateHandler(response http.ResponseWriter, request *http.Request, ps htt
 // @Produce json
 // @Param hostname    path    string    true    "Hostname"
 // @Param type        path    string    true    "Build Type"
-// @Param machine     body    string    true    "Machine definition if desired.  Can be used to override nearly all properties of a compiled machine.  See examples directory for machine definition."
+// @Param {object}     body    string    true    "Machine definition if desired.  Can be used to override nearly all properties of a compiled machine.  See examples directory for machine definition."
 // @Success 200    {object} string "{"State": "OK", "Token": <UUID of the build>}"
 // @Failure 500    {object} string "Failed to set build mode on hostname"
 // @Router /build/{hostname}/{type} [PUT]
