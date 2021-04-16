@@ -362,7 +362,7 @@ func (w *Waitron) runBuildCommands(j *Job, b []config.BuildCommand) error {
 /*
 	Create a register a new job for the specified hostname, and optionally the build type.
 */
-func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
+func (w *Waitron) Build(hostname string, buildTypeName string, machineDefinitionOverride []byte) (string, error) {
 	/*
 		Since the details of a BuildType can also exist directly in the root config,
 		an empty build-type can be assumed to mean we'll use that.
@@ -396,7 +396,7 @@ func (w *Waitron) Build(hostname string, buildTypeName string) (string, error) {
 	w.addLog(fmt.Sprintf("retrieving complied machine details for job %s", token), config.LogLevelDebug)
 
 	// Get the compiled machine details from any config, build type, and plugins being used
-	foundMachine, err := w.GetMergedMachine(hostname, "", buildTypeName)
+	foundMachine, err := w.GetMergedMachine(hostname, "", buildTypeName, machineDefinitionOverride)
 
 	if err != nil {
 		return "", err
@@ -523,10 +523,10 @@ func (w *Waitron) getMergedInventoryMachine(hostname string, mac string) (*machi
 /*
   This produces the final merge machine with config and build type details.
 */
-func (w *Waitron) GetMergedMachine(hostname string, mac string, buildTypeName string) (*machine.Machine, error) {
+func (w *Waitron) GetMergedMachine(hostname string, mac string, buildTypeName string, machineDefinitionOverride []byte) (*machine.Machine, error) {
 
 	/*
-		We need the "merge" order to go config -> build type -> machine
+		We need the "merge" order to go config -> build type -> machine -> machineDefinition (something passed in from a cli etc that will override everything.)
 		But a machine can also specify a build type for itself, which could have come from any of the available plugins,
 		so we need to take the initial machine compile from plugins, then create a new base machine and start merging
 		things in the order we want because we wouldn't know the true final build type until after the plugins have provided all the details.
@@ -573,13 +573,20 @@ func (w *Waitron) GetMergedMachine(hostname string, mac string, buildTypeName st
 		}
 	}
 
-	// Finally, merge in the machine-specific details.
+	// Merge in the machine-specific details.
 	if f, err := yaml.Marshal(foundMachine); err == nil {
 		if err = yaml.Unmarshal(f, baseMachine); err != nil {
 			return nil, err
 		}
 	} else {
 		return nil, err
+	}
+
+	// Finally, merge in any overriding machine-specific details that were passed in.
+	if machineDefinitionOverride != nil {
+		if err = yaml.Unmarshal(machineDefinitionOverride, baseMachine); err != nil {
+			return nil, err
+		}
 	}
 
 	return baseMachine, nil

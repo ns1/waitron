@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -40,7 +41,7 @@ func definitionHandler(response http.ResponseWriter, request *http.Request, ps h
 	hostname := ps.ByName("hostname")
 	btype := ps.ByName("type")
 
-	m, err := w.GetMergedMachine(hostname, "", btype)
+	m, err := w.GetMergedMachine(hostname, "", btype, nil)
 	if err != nil || m == nil {
 		http.Error(response, fmt.Sprintf("Unable to find host definition for '%s' '%s'. %s", hostname, btype, err.Error()), 404)
 		return
@@ -101,8 +102,11 @@ func templateHandler(response http.ResponseWriter, request *http.Request, ps htt
 // @Title buildHandler
 // @Description Put the server in build mode
 // @Summary Put the server in build mode
+// @Accept json
+// @Produce json
 // @Param hostname    path    string    true    "Hostname"
 // @Param type        path    string    true    "Build Type"
+// @Param {object}     body    string    true    "Machine definition if desired.  Can be used to override nearly all properties of a compiled machine.  See examples directory for machine definition."
 // @Success 200    {object} string "{"State": "OK", "Token": <UUID of the build>}"
 // @Failure 500    {object} string "Failed to set build mode on hostname"
 // @Router /build/{hostname}/{type} [PUT]
@@ -111,7 +115,15 @@ func buildHandler(response http.ResponseWriter, request *http.Request, ps httpro
 	hostname := ps.ByName("hostname")
 	btype := ps.ByName("type")
 
-	token, err := w.Build(hostname, btype)
+	body := http.MaxBytesReader(response, request.Body, 1024*1024) // 1MB limit on posted machine definition.  Even that seems insane.
+	machineDefinition, err := ioutil.ReadAll(body)
+
+	if err != nil {
+		http.Error(response, fmt.Sprintf("Failed to set build mode for %s - %s while reading request body: %s", hostname, btype, err.Error()), 500)
+		return
+	}
+
+	token, err := w.Build(hostname, btype, machineDefinition)
 	if err != nil {
 		http.Error(response, fmt.Sprintf("Failed to set build mode for %s - %s: %s", hostname, btype, err.Error()), 500)
 		return
@@ -149,8 +161,11 @@ func doneHandler(response http.ResponseWriter, request *http.Request, ps httprou
 // @Title cancelHandler
 // @Description Remove the server from build mode
 // @Summary Remove the server from build mode
+// @Accept json
+// @Produce json
 // @Param hostname    path    string    true    "Hostname"
-// @Param token        path    string    true    "Token"
+// @Param token       path    string    true    "Token"
+// @Param {object}    body    string    true    "Machine definition if desired.  Can be used to override nearly all properties of a compiled machine.  See examples directory for machine definition."
 // @Success 200    {object} string "{"State": "OK"}"
 // @Failure 500    {object} string "Failed to cancel build mode"
 // @Router /cancel/{hostname}/{token} [PUT]
