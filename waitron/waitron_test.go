@@ -121,14 +121,14 @@ func TestWaitron(t *testing.T) {
 
 	/******************************************************************/
 
-	m, err := w.GetMergedMachine("", "", "")
+	m, err := w.GetMergedMachine("", "", "", nil)
 
 	if m != nil {
 		t.Errorf("Returned merged machine for unknown machine: %v", err)
 		return
 	}
 
-	m, err = w.GetMergedMachine("test01.prod", "", "")
+	m, err = w.GetMergedMachine("test01.prod", "", "", nil)
 
 	if err != nil {
 		t.Errorf("Error while getting merge machine: %v", err)
@@ -152,14 +152,14 @@ func TestWaitron(t *testing.T) {
 
 	/******************************************************************/
 
-	_, err = w.Build("test01.prod", "invalid_build_type")
+	_, err = w.Build("test01.prod", "invalid_build_type", nil)
 
 	if err == nil {
 		t.Errorf("Allowed build with invalid build type")
 		return
 	}
 
-	token, err := w.Build("test01.prod", "")
+	token, err := w.Build("test01.prod", "", nil)
 
 	if err != nil {
 		t.Errorf("Failed to set build: %v", err)
@@ -171,7 +171,12 @@ func TestWaitron(t *testing.T) {
 		return
 	}
 
-	if token2, _ := w.Build("test01.prod", ""); token2 != "" {
+	if token == "" {
+		t.Errorf("invalid token returned: %s", token)
+		return
+	}
+
+	if token2, _ := w.Build("test01.prod", "", nil); token2 != "" {
 		t.Errorf("simultaneous builds for a single host were permitted: %s", token)
 		return
 	}

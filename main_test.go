@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -50,9 +52,10 @@ func (t *TestPlugin2) Init() error {
 func (t *TestPlugin2) GetMachine(s string, m string) (*machine.Machine, error) {
 
 	mm := &machine.Machine{
-		Hostname:  "test01.prod",
-		ShortName: "test02",
-		Domain:    "domain02",
+		Hostname:       "test01.prod",
+		ShortName:      "test02",
+		Domain:         "domain02",
+		IpmiAddressRaw: "original_ipmi_address",
 		Network: []machine.Interface{
 			machine.Interface{
 				MacAddress: "de:ad:be:ef",
@@ -124,15 +127,36 @@ func TestPixieHandlerNotInBuildMode(t *testing.T) {
 
 	/******************************************************************/
 
-	request, _ := http.NewRequest("GET", "/boot/11:22:33:44:51", nil)
+	request, _ := http.NewRequest("PUT", "/boot", nil)
+	request.Body = ioutil.NopCloser(bytes.NewBufferString("{\"ipmi_address\": \"new_ipmi_address\"}"))
 	response := httptest.NewRecorder()
+	ps := httprouter.Params{httprouter.Param{Key: "hostname", Value: "test01.prod"}}
+	buildHandler(response, request, ps, w)
 
-	ps := httprouter.Params{httprouter.Param{Key: "macaddr", Value: "1"}}
+	expected := "\"State\":\"OK\"}"
+	if !strings.Contains(response.Body.String(), expected) {
+		t.Errorf("Reponse body is '%s', expected to contain '%s'", response.Body, expected)
+	}
+
+	request, _ = http.NewRequest("GET", "/status", nil)
+	response = httptest.NewRecorder()
+	ps = httprouter.Params{}
+	status(response, request, ps, w)
+
+	expected = "new_ipmi_address"
+	if !strings.Contains(response.Body.String(), expected) {
+		t.Errorf("Reponse body is '%s', expected to contain '%s'", response.Body, expected)
+	}
+
+	request, _ = http.NewRequest("GET", "/boot", nil)
+	response = httptest.NewRecorder()
+	ps = httprouter.Params{httprouter.Param{Key: "macaddr", Value: "cow"}}
 
 	pixieHandler(response, request, ps, w)
 
-	expected := "failed to get pxe config"
+	expected = "failed to get pxe config"
 	if !strings.Contains(response.Body.String(), expected) {
-		t.Errorf("Reponse body is %s, expected %s", response.Body, expected)
+		t.Errorf("Reponse body is '%s', expected to contain '%s'", response.Body, expected)
 	}
+
 }
