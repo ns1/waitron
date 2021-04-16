@@ -376,12 +376,19 @@ PUT /build/{hostname}/{type}
 
 Put the server in build mode
 
+#### Consumes
+  * application/json
+
+#### Produces
+  * application/json
+
 #### Parameters
 
 | Name | Source | Type | Go type | Separator | Required | Default | Description |
 |------|--------|------|---------|-----------| :------: |---------|-------------|
 | hostname | `path` | string | `string` |  | ✓ |  | Hostname |
 | type | `path` | string | `string` |  | ✓ |  | Build Type |
+| machine | `body` | string | `string` | | ✓ | | Machine definition if desired.  Can be used to override nearly all properties of a compiled machine.  See examples directory for machine definition. |
 
 #### All responses
 | Code | Status | Description | Has headers | Schema |
@@ -418,12 +425,19 @@ PUT /cancel/{hostname}/{token}
 
 Remove the server from build mode
 
+#### Consumes
+  * application/json
+
+#### Produces
+  * application/json
+
 #### Parameters
 
 | Name | Source | Type | Go type | Separator | Required | Default | Description |
 |------|--------|------|---------|-----------| :------: |---------|-------------|
 | hostname | `path` | string | `string` |  | ✓ |  | Hostname |
 | token | `path` | string | `string` |  | ✓ |  | Token |
+| machine | `body` | string | `string` | | ✓ | | Machine definition if desired.  Can be used to override nearly all properties of a compiled machine.  See examples directory for machine definition. |
 
 #### All responses
 | Code | Status | Description | Has headers | Schema |
