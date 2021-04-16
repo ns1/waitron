@@ -437,7 +437,7 @@ Remove the server from build mode
 |------|--------|------|---------|-----------| :------: |---------|-------------|
 | hostname | `path` | string | `string` |  | ✓ |  | Hostname |
 | token | `path` | string | `string` |  | ✓ |  | Token |
-| machine | `body` | string | `string` | | ✓ | | Machine definition if desired.  Can be used to override nearly all properties of a compiled machine.  See examples directory for machine definition. |
+| {object} | `body` | string | `string` | | ✓ | | Machine definition if desired.  Can be used to override nearly all properties of a compiled machine.  See examples directory for machine definition. |
 
 #### All responses
 | Code | Status | Description | Has headers | Schema |

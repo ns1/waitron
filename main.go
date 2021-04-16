@@ -165,7 +165,7 @@ func doneHandler(response http.ResponseWriter, request *http.Request, ps httprou
 // @Produce json
 // @Param hostname    path    string    true    "Hostname"
 // @Param token       path    string    true    "Token"
-// @Param machine     body    string    true    "Machine definition if desired.  Can be used to override nearly all properties of a compiled machine.  See examples directory for machine definition."
+// @Param {object}    body    string    true    "Machine definition if desired.  Can be used to override nearly all properties of a compiled machine.  See examples directory for machine definition."
 // @Success 200    {object} string "{"State": "OK"}"
 // @Failure 500    {object} string "Failed to cancel build mode"
 // @Router /cancel/{hostname}/{token} [PUT]
