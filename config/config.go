@@ -35,10 +35,10 @@ type BuildCommand struct {
 }
 
 type BuildType struct {
-	Cmdline  string `yaml:"cmdline,omitempty"`
-	Kernel   string `yaml:"kernel,omitempty"`
-	Initrd   string `yaml:"initrd,omitempty"`
-	ImageURL string `yaml:"image_url,omitempty"`
+	Cmdline  string   `yaml:"cmdline,omitempty"`
+	Kernel   string   `yaml:"kernel,omitempty"`
+	Initrd   []string `yaml:"initrd,omitempty"`
+	ImageURL string   `yaml:"image_url,omitempty"`
 
 	OperatingSystem string            `yaml:"operatingsystem,omitempty"`
 	Finish          string            `yaml:"finish,omitempty"`

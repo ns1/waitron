@@ -740,12 +740,9 @@ func (w *Waitron) getPxeConfigForUnknown(b *config.BuildType, macaddress string)
 
 	pixieConfig := PixieConfig{}
 
-	var cmdline, imageURL, kernel, initrd string
+	var cmdline string
 
 	cmdline = b.Cmdline
-	imageURL = b.ImageURL
-	kernel = b.Kernel
-	initrd = b.Initrd
 
 	tpl, err := pongo2.FromString(cmdline)
 	if err != nil {
@@ -758,10 +755,12 @@ func (w *Waitron) getPxeConfigForUnknown(b *config.BuildType, macaddress string)
 		return pixieConfig, err
 	}
 
-	imageURL = strings.TrimRight(imageURL, "/")
+	imageURL := strings.TrimRight(b.ImageURL, "/")
 
-	pixieConfig.Kernel = imageURL + "/" + kernel
-	pixieConfig.Initrd = []string{imageURL + "/" + initrd}
+	pixieConfig.Kernel = imageURL + "/" + b.Kernel
+	for _, initrd := range b.Initrd {
+		pixieConfig.Initrd = append(pixieConfig.Initrd, imageURL+"/"+initrd)
+	}
 	pixieConfig.Cmdline = cmdline
 
 	return pixieConfig, nil
@@ -804,14 +803,9 @@ func (w *Waitron) GetPxeConfig(macaddress string) (PixieConfig, error) {
 	*/
 	uniquePxeRequest := false
 
-	var cmdline, imageURL, kernel, initrd string
-
 	j.RLock()
 
-	cmdline = j.Machine.Cmdline
-	imageURL = j.Machine.ImageURL
-	kernel = j.Machine.Kernel
-	initrd = j.Machine.Initrd
+	cmdline := j.Machine.Cmdline
 
 	tpl, err := pongo2.FromString(cmdline)
 	if err != nil {
@@ -848,17 +842,19 @@ func (w *Waitron) GetPxeConfig(macaddress string) (PixieConfig, error) {
 
 	j.Unlock()
 
-	imageURL = strings.TrimRight(imageURL, "/")
+	imageURL := strings.TrimRight(j.Machine.ImageURL, "/")
 
-	pixieConfig.Kernel = imageURL + "/" + kernel
-	pixieConfig.Initrd = []string{imageURL + "/" + initrd}
+	pixieConfig.Kernel = imageURL + "/" + j.Machine.Kernel
+	for _, initrd := range j.Machine.Initrd {
+		pixieConfig.Initrd = append(pixieConfig.Initrd, imageURL+"/"+initrd)
+	}
 	pixieConfig.Cmdline = cmdline
 
 	/*
 		It can be pretty valuable to be able to run commands when a PXE is received,
 		but they shouldn't be allowed to block an install at this point.
 
-		This would probably be good spot where go-routines could leak if a user were to create super-long running commands
+		This would probably be a good spot where go-routines could leak if a user were to create super-long running commands
 		that don't, or practically don't, timeout.
 	*/
 	if uniquePxeRequest {
