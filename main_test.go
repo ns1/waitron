@@ -84,7 +84,7 @@ func TestPixieHandlerNotInBuildMode(t *testing.T) {
 			Cmdline:  "cmd",
 			ImageURL: "image.com",
 			Kernel:   "popcorn",
-			Initrd:   "initrd",
+			Initrd:   []string{"initrd"},
 		},
 		MachineInventoryPlugins: []config.MachineInventoryPluginSettings{
 			config.MachineInventoryPluginSettings{
