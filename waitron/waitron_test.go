@@ -77,7 +77,7 @@ func TestWaitron(t *testing.T) {
 			Cmdline:  "cmd",
 			ImageURL: "image.com",
 			Kernel:   "popcorn",
-			Initrd:   "initrd",
+			Initrd:   []string{"initrd"},
 		},
 		BuildTypes: make(map[string]config.BuildType),
 		MachineInventoryPlugins: []config.MachineInventoryPluginSettings{
@@ -252,7 +252,7 @@ func TestWaitron(t *testing.T) {
 		Cmdline:  "cmd",
 		ImageURL: "unknown.com",
 		Kernel:   "sanders",
-		Initrd:   "it_is_rd",
+		Initrd:   []string{"it_is_rd"},
 	}
 
 	uCfg, err := w.GetPxeConfig("un:kn:ow:nt:hi:ng")
