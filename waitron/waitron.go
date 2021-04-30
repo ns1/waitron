@@ -309,7 +309,7 @@ func (w *Waitron) timedCommandOutput(timeout time.Duration, command string) ([]b
 	out := make([]byte, 512, 512)
 	n, err := outP.Read(out)
 
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return out, err
 	}
 
@@ -351,8 +351,12 @@ func (w *Waitron) runBuildCommands(j *Job, b []config.BuildCommand) error {
 		// Now actually execute the command and return err if ErrorsFatal
 		out, err := w.timedCommandOutput(time.Duration(buildCommand.TimeoutSeconds)*time.Second, cmdline)
 
-		if err != nil && err != io.EOF && buildCommand.ErrorsFatal {
-			return errors.New(err.Error() + ":" + string(out))
+		if err != nil {
+			if buildCommand.ErrorsFatal {
+				return errors.New(err.Error() + ":" + string(out))
+			} else {
+				w.addLog(err.Error()+":"+string(out), config.LogLevelWarning)
+			}
 		}
 	}
 
