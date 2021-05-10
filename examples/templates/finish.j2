@@ -1,13 +1,23 @@
 #!/bin/sh
 
+/bin/mkdir -p /root/.ssh;
+/bin/sh -c "echo 'ssh-rsa SOME_PUBLIC_KEY bootstrap' >> /root/.ssh/authorized_keys";
+chmod 600 /root/.ssh/authorized_keys;
 
 rm -rf /etc/netplan/*
 
-cat <<ENDNETPLAN > /etc/netplan/netplan-cfg.yaml
+# We're going to assign things based on MAC so that we don't have to care about how interfaces were named.
+# We could also rename interfaces with udev rules, or indirectly with netplan.
+
+cat <<ENDNETPLAN > /etc/netplan/netplan-cfg.yml
 network:
     ethernets:
 {% for interface in machine.Network %}
-        {{interface.Name}}:
+{% if "waitron_primary" in interface.Tags %}
+        # {{interface.Name}}
+        primary:
+            match:
+              macaddress: {{ job.TriggerMacRaw }}
             addresses:
 {% for ipconfig in interface.Addresses4 %}            
                 - {{ ipconfig.IPAddress}}/{{ipconfig.Cidr}}
@@ -29,7 +39,17 @@ network:
                 - example.com
     renderer: networkd
     version: 2
+{% endif %}
 {% endfor %}
 ENDNETPLAN
 
-wget -O /dev/null -q '{{config.BaseURL}}/done/{{machine.Hostname}}/{{machine.Token}}'; 
+cat <<FINALTRIGGER > /etc/rc.local
+#!/bin/sh
+
+rm -f /etc/rc.local
+
+wget -O /dev/null -q '{{machine.BaseURL}}/done/{{machine.Hostname}}/{{job.Token}}';
+
+FINALTRIGGER
+
+chmod 0755 /etc/rc.local

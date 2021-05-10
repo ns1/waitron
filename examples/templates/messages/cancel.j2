@@ -1,3 +1,6 @@
 #!/bin/bash
 
+# Uncomment if you want your machines rebooted when installs are terminated.
+#ipmitool -H {{ machine.IpmiAddressRaw }} -U {{ machine.IpmiUser }} -P {{ machine.IpmiPassword }} -I lanplus chassis power cycle
+
 echo "Maybe I'll tell slack that someone terminated the build."

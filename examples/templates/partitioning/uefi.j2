@@ -1,0 +1,52 @@
+{% with configcontext = machine.Params.config_context|from_yaml %}
+# auto method must be lvm
+d-i partman-auto/method string lvm
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-md/device_remove_md boolean true
+d-i partman-lvm/confirm boolean true
+d-i partman-lvm/confirm_nooverwrite boolean true
+d-i partman-basicfilesystems/no_swap boolean false
+
+# Keep that one set to true so we end up with a UEFI enabled
+# system. If set to false, /var/lib/partman/uefi_ignore will be touched
+d-i partman-efi/non_efi_system boolean true
+
+# enforce usage of GPT - a must have to use EFI!
+d-i partman-basicfilesystems/choose_label string gpt
+d-i partman-basicfilesystems/default_label string gpt
+d-i partman-partitioning/choose_label string gpt
+d-i partman-partitioning/default_label string gpt
+d-i partman/choose_label string gpt
+d-i partman/default_label string gpt
+
+d-i partman-auto/choose_recipe select boot-root-all
+d-i partman-auto/expert_recipe string \
+
+simple_recipe ::                                                \
+538 538 1075 free \
+\$iflabel{ gpt } \
+\$reusemethod{ } \
+method{ efi } \
+format{ } \
+. \
+        2048 1000000000 2048 ext4                       \
+                \$primary{ } \$bootable{ }              \
+                \$defaultignore{ }                      \
+                method{ format } format{ }              \
+                use_filesystem{ } filesystem{ ext4 }    \
+                mountpoint{ /boot }                     \
+        .                                               \
+        2048 500 1000000000 ext4                        \
+                \$lvmok{ }                              \
+                method{ format } format{ }              \
+                use_filesystem{ } filesystem{ ext4 }    \
+                mountpoint{ / }                         \
+        .
+
+# confirm write
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman-md/confirm boolean true
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+{% endwith %}

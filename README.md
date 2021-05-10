@@ -21,13 +21,13 @@ docker build -t waitron . && docker-compose -f ./docker-compose.yml up
 ```
 
 ```
-$ curl -X PUT http://localhost:7078/build/dns02.example.com
+$ curl -X PUT http://localhost/build/dns02.example.com
 {"Token":"fb300739-b4ce-4740-af26-80a99326ee05"
 
-$ curl -X GET http://localhost:7078/status/dns02.example.com
+$ curl -X GET http://localhost/status/dns02.example.com
 pending
 
-curl -X PUT http://localhost:7078/cancel/dns02.example.com/fb300739-b4ce-4740-af26-80a99326ee05
+curl -X PUT http://localhost/cancel/dns02.example.com/fb300739-b4ce-4740-af26-80a99326ee05
 {"State":"OK"}
 
 ```
