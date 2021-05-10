@@ -1,4 +1,4 @@
-### A (very) brief how-to for a simple Waitron set-up
+### WIP: A (very) brief how-to for a simple Waitron set-up
 
 These steps assume you already have have a DHCP server handing out IP addresses.  Waitron and Pixiecore work along-side _existing_ DHCP servers.  It's possible to hand out temporary, local IPs with DHCP and then switch to public v4 or v6 for the rest of the install process.
 
@@ -15,7 +15,7 @@ You'll need to run pixiecore on a machine in the same network where you plan to 
 First, build pixiecore:
 
 ```
-(cd /tmp/ \
+(GOROOT=/usr/local/go; cd /tmp/ \
         && git clone https://github.com/google/netboot.git \
         && mkdir -p $GOROOT/src/go.universe.tf \
         && ln -s /tmp/netboot  $GOROOT/src/go.universe.tf/netboot \
