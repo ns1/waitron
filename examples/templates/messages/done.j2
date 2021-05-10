@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Uncomment if you need/want one last final reboot after all the work is done, assuming you're calling the "done" endpoint at some point in your install steps or templates.
 #ipmitool -H {{ machine.IpmiAddressRaw }} -U {{ machine.IpmiUser }} -P {{ machine.IpmiPassword }} -I lanplus chassis power cycle
 
 echo "Maybe I'll tell slack that the build finished."

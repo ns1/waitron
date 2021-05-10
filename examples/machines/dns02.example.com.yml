@@ -1,5 +1,8 @@
 
 ipmi_address: "10.55.24.2"
+ipmi_user: "my_ipmi_username"
+ipmi_password: "my_ipmi_password"
+
 
 network:
   - name: provisioning

@@ -43,5 +43,13 @@ network:
 {% endfor %}
 ENDNETPLAN
 
+cat <<FINALTRIGGER > /etc/rc.local
+#!/bin/sh
+
+rm -f /etc/rc.local
+
 wget -O /dev/null -q '{{machine.BaseURL}}/done/{{machine.Hostname}}/{{job.Token}}';
 
+FINALTRIGGER
+
+chmod 0755 /etc/rc.local
