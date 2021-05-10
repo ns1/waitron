@@ -1,6 +1,6 @@
 ### A (very) brief how-to for a simple Waitron set-up
 
-These steps assume you already have have DHCP server handing out IP addresses.  Waitron and Pixiecore work along-side _existing_ DHCP servers.  It's possible to hand out temporary, local IPs with DHCP and then switch to public v4 or v6 for the rest of the install process.
+These steps assume you already have have a DHCP server handing out IP addresses.  Waitron and Pixiecore work along-side _existing_ DHCP servers.  It's possible to hand out temporary, local IPs with DHCP and then switch to public v4 or v6 for the rest of the install process.
 
 As long as your DHCP server is handing out addresses that will allow you to reach your local pixiecore installation, things should just work.  If you're planning to do a full OS install from netboot, which is what the examples in the repo attempt, you'll only need to ensure that the IP settings in dns02.example.com.yml can reach the outside world.
 
