@@ -1,7 +1,8 @@
 #!/bin/bash
 
-ipmitool -H {{ machine.IpmiAddressRaw }} -U {{ machine.IpmiUser }} -P {{ machine.IpmiPassword }} -I lanplus chassis power on; sleep 5;
-ipmitool -H {{ machine.IpmiAddressRaw }} -U {{ machine.IpmiUser }} -P {{ machine.IpmiPassword }} -I lanplus chassis bootdev pxe
-ipmitool -H {{ machine.IpmiAddressRaw }} -U {{ machine.IpmiUser }} -P {{ machine.IpmiPassword }} -I lanplus chassis power cycle
+# Uncomment if you've set up ipmi access
+#ipmitool -H {{ machine.IpmiAddressRaw }} -U {{ machine.IpmiUser }} -P {{ machine.IpmiPassword }} -I lanplus chassis power on; sleep 5;
+#ipmitool -H {{ machine.IpmiAddressRaw }} -U {{ machine.IpmiUser }} -P {{ machine.IpmiPassword }} -I lanplus chassis bootdev pxe
+#ipmitool -H {{ machine.IpmiAddressRaw }} -U {{ machine.IpmiUser }} -P {{ machine.IpmiPassword }} -I lanplus chassis power cycle
 
 echo "Maybe I'll tell slack that I'm going to build."
