@@ -1,19 +1,26 @@
+
+ipmi_address: "10.55.24.2"
+
 network:
+  - name: provisioning
+    tags: ["waitron_provisioning"]   # Tags can be helpful for later use in templates.  Build-types, machines, interfaces, and addresses can all be tagged separately.
+    gateway6: "fe80::0004:cf80:100b:0003:0001"
+    addresses6:
+        - ipaddress: "fe80::0004:cf80:100b:0003:0002"
+          netmask: "ffff:ffff:ffff:ffff::"
+          cidr: "64"
+
   - name: eno1
+    tags: ["waitron_primary"]
+    gateway4: "10.35.25.1"
     addresses4:
-        - ipaddress: 10.35.24.243
+        - ipaddress: 10.35.25.5
           netmask: 255.255.255.0
           cidr: 24
+
+    gateway6: "fe80::5555:cf80:100b:0003:0001"
     addresses6:
-        - ipaddress: fe80::e08d:faff:fefe:cc1d
+        - ipaddress: "fe80::5555:cf80:100b:0003:0002"
           netmask: "ffff:ffff:ffff:ffff::"
           cidr: 64
-    macaddress: de:ad:c0:de:ca:fe
-    gateway4: 10.35.24.1
-    gateway6: "fe80::e08d:faff:fefe:1"
-
-
-params:
-    ipmi_address: 10.20.25.2
-    ipmi_proxy: ipmi01.example.com
-    addressing_type: static
+    macaddress: "de:ad:c0:de:ca:fe"    

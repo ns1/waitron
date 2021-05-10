@@ -1,0 +1,51 @@
+{% with configcontext = machine.Params.config_context|from_yaml %}
+# My default partitioning template 
+# Disks
+d-i partman-auto/disk string {{ configcontext.primary_disk | default: machine.Params.primary_disk | default:"/dev/sda /dev/sdb" }}
+d-i partman-auto/method string raid
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-md/device_remove_md boolean true
+d-i partman-lvm/confirm boolean true
+d-i partman-auto/choose_recipe select raid_recipe
+d-i partman-auto-lvm/new_vg_name string vg00
+d-i partman-auto-lvm/guided_size string max
+d-i partman-basicfilesystems/no_swap boolean false
+
+# clean up if something is there
+d-i partman-auto/purge_lvm_from_device boolean true
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-md/device_remove_md boolean true
+d-i partman-lvm/confirm boolean true
+d-i partman-auto/expert_recipe string                         \
+      raid_recipe ::                                          \
+              2048 1000000000 2048 ext4                       \
+                      \$primary{ } \$bootable{ }              \
+                      method{ raid }                          \
+                      mountpoint{ /boot }                     \
+              .                                               \
+              2048 500 1000000000 ext4                        \
+                      method{ raid }                          \
+                      mountpoint{ / }                         \
+              .
+
+d-i partman-auto-raid/recipe string \
+    1 2 0 ext4 /boot                \
+          /dev/sda1#/dev/sdb1       \
+    .                               \
+    1 2 0 ext4 /                    \
+          /dev/sda5#/dev/sdb5       \
+    .
+
+# confirm write
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+d-i partman-lvm/confirm boolean true
+d-i partman-md/confirm boolean true
+d-i partman-md/confirm_nooverwrite  boolean true
+
+d-i partman/mount_style select label
+
+d-i mdadm/boot_degraded boolean false
+{% endwith %}

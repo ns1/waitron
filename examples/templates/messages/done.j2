@@ -1,3 +1,5 @@
 #!/bin/bash
 
+ipmitool -H {{ machine.IpmiAddressRaw }} -U {{ machine.IpmiUser }} -P {{ machine.IpmiPassword }} -I lanplus chassis power cycle
+
 echo "Maybe I'll tell slack that the build finished."
