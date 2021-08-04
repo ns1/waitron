@@ -4,7 +4,7 @@ These steps assume you already have have a DHCP server handing out IP addresses.
 
 As long as your DHCP server is handing out addresses that will allow you to reach your local pixiecore installation, things should just work.  If you're planning to do a full OS install from netboot, which is what the examples in the repo attempt, you'll only need to ensure that the IP settings in dns02.example.com.yml can reach the outside world.
 
-In the examples/machines directory, make sure to update dns02.example.com.yml with the MAC of your installing machine and the IP details you'd like it to have. If the server running Waitron has access to run IPMI commands on your target device, set the IPMI details in dns02.example.com.yml and uncomment the ipmitool lines in the examples/messages files.
+In the examples/machines directory, make sure to update dns02.example.com.yml with the MAC of your installing machine and the IP details you'd like it to have. If the server running Waitron has access to run IPMI commands on your target device, set the IPMI details in dns02.example.com.yml and uncomment the ipmitool lines in the examples/templates/messages/*.j2 files.
 
 Also, change `SOME_PASSWORD_THAT_YOU_SHOULD_CHANGE` in the examples/templates/preseed.j2 file. :)
 
